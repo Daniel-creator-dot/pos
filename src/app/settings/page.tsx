@@ -206,7 +206,7 @@ export default function SettingsPage() {
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
                     <option value="GBP">GBP (£)</option>
-                    <option value="GHS">GHS (₵)</option>
+                    <option value="GHS">GHS (GH₵)</option>
                   </select>
                 </div>
                 <div>
