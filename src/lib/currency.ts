@@ -2,7 +2,7 @@ const currencySymbols: Record<string, string> = {
   USD: "$",
   EUR: "€",
   GBP: "£",
-  GHS: "₵",
+  GHS: "GH₵",
   JPY: "¥",
   CNY: "¥",
   INR: "₹",
