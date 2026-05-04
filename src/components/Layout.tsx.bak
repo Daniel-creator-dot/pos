@@ -1,0 +1,165 @@
+import { Outlet, Link, useLocation, Navigate } from "react-router-dom";
+import { 
+  LayoutDashboard, 
+  ShoppingCart, 
+  Package, 
+  History, 
+  BarChart3, 
+  Settings, 
+  LogOut,
+  Menu,
+  X,
+  Warehouse
+} from "lucide-react";
+import { useState } from "react";
+import { User } from "../types/index.ts";
+import { cn } from "../lib/utils.ts";
+
+interface LayoutProps {
+  user: User;
+  onLogout: () => void;
+  onUpdateUser: (user: User) => void;
+}
+
+export default function Layout({ user, onLogout, onUpdateUser }: LayoutProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
+
+  const navigation = [
+    { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["admin", "manager"] },
+    { name: "POS", href: "/pos", icon: ShoppingCart, roles: ["admin", "manager", "cashier"] },
+    { name: "Products", href: "/products", icon: Package, roles: ["admin", "manager", "storekeeper"] },
+    { name: "Stock", href: "/stock", icon: Warehouse, roles: ["admin", "manager", "storekeeper"] },
+    { name: "Sales", href: "/sales", icon: History, roles: ["admin", "manager", "cashier"] },
+    { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "manager"] },
+    { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
+  ];
+
+  const filteredNav = navigation.filter(item => item.roles.includes(user.role));
+  
+  // Check if current path is allowed
+  const isPathAllowed = navigation.some(item => 
+    item.href === location.pathname && item.roles.includes(user.role)
+  );
+
+  // If path is not allowed and not the root (which might be redirected elsewhere if needed)
+  // we redirect to the first allowed page or dashboard
+  if (!isPathAllowed && location.pathname !== "/") {
+    return <Navigate to="/" replace />;
+  }
+
+  // If user is cashier and at root, redirect to POS
+  if (user.role === "cashier" && location.pathname === "/") {
+    return <Navigate to="/pos" replace />;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      {/* Sidebar Desktop */}
+      <aside className="hidden md:flex flex-col w-64 bg-black border-r border-zinc-800 shadow-2xl z-20">
+        <div className="p-8">
+          <div className="flex items-center gap-3 group cursor-pointer">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform">
+              <LayoutDashboard className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-white">SwiftPOS</h1>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-black">Enterprise</p>
+            </div>
+          </div>
+        </div>
+        
+        <nav className="flex-1 px-4 space-y-1 mt-6">
+          {filteredNav.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 group relative",
+                  isActive 
+                    ? "bg-white text-black shadow-xl" 
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                )}
+              >
+                <item.icon className={cn("w-5 h-5 transition-transform", isActive ? "text-indigo-600" : "text-zinc-600 group-hover:text-zinc-400")} />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-6 mt-auto">
+          <div className="p-5 bg-zinc-900 rounded-2xl border border-zinc-800">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg font-black shadow-lg shadow-indigo-600/20">
+                {user.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mt-0.5">{user.role}</p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="flex items-center justify-center gap-3 w-full py-2.5 text-xs font-black text-zinc-400 bg-zinc-800 rounded-lg hover:bg-zinc-700 hover:text-white transition-all active:scale-95"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Header */}
+      <header className="md:hidden flex items-center justify-between p-4 bg-indigo-950 border-b border-indigo-900">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-indigo-500 rounded flex items-center justify-center">
+            <LayoutDashboard className="w-4 h-4 text-white" />
+          </div>
+          <h1 className="text-xl font-bold text-white">SwiftPOS</h1>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-indigo-200">
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </header>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-indigo-950 pt-16">
+          <nav className="p-4 space-y-2">
+            {filteredNav.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-4 text-base font-bold rounded-2xl transition-all",
+                  location.pathname === item.href ? "bg-indigo-600 text-white" : "text-indigo-200"
+                )}
+              >
+                <item.icon className="w-6 h-6" />
+                {item.name}
+              </Link>
+            ))}
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-3 w-full px-4 py-4 text-base font-bold text-red-400 mt-4"
+            >
+              <LogOut className="w-6 h-6" />
+              Sign Out
+            </button>
+          </nav>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50">
+        <div className="max-w-7xl mx-auto">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
