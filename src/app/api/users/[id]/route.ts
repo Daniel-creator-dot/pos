@@ -15,8 +15,8 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only admin can update users
-    if (session.user.role.name !== "admin") {
+    // Only admin or superadmin can update users
+    if (session.user.role.name !== "admin" && session.user.role.name !== "superadmin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -87,8 +87,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only admin can delete users
-    if (session.user.role.name !== "admin") {
+    // Only admin or superadmin can delete users
+    if (session.user.role.name !== "admin" && session.user.role.name !== "superadmin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

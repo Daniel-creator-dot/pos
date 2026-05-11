@@ -28,6 +28,12 @@ export async function GET() {
             name: true,
           },
         },
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -58,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, email, password, roleId, storeId } = body;
+    const { name, email, password, roleId, storeId, companyId } = body;
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
@@ -75,14 +81,25 @@ export async function POST(request: Request) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Resolve roleId if it's a role name
+    let finalRoleId = roleId;
+    if (["admin", "manager", "cashier", "superadmin", "storekeeper"].includes(roleId)) {
+      const role = await prisma.role.findFirst({
+        where: { name: roleId as any },
+      });
+      if (role) {
+        finalRoleId = role.id;
+      }
+    }
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         passwordHash,
-        roleId,
+        roleId: finalRoleId,
         storeId: storeId || session.user.storeId,
-        companyId: session.user.companyId,
+        companyId: companyId || session.user.companyId,
       },
       include: {
         role: {
