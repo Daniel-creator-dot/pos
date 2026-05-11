@@ -688,8 +688,14 @@ export default function SuperadminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Company</label>
-                    <select required className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none text-slate-900" value={userForm.companyId} onChange={(e) => setUserForm({...userForm, companyId: e.target.value})}>
-                      <option value="">Select Company</option>
+                    <select 
+                      required={userForm.roleId !== 'superadmin'}
+                      disabled={userForm.roleId === 'superadmin'}
+                      className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed" 
+                      value={userForm.roleId === 'superadmin' ? '' : userForm.companyId} 
+                      onChange={(e) => setUserForm({...userForm, companyId: e.target.value})}
+                    >
+                      <option value="">{userForm.roleId === 'superadmin' ? 'Platform Wide' : 'Select Company'}</option>
                       {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
