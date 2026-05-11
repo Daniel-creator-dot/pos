@@ -10,7 +10,8 @@ import {
   LogOut, Settings, ShieldCheck, Key,
   MoreVertical, Trash2, Edit3, X, Menu,
   UserPlus, Check, AlertCircle, RefreshCw,
-  TrendingUp, BarChart3, Activity, Shield
+  TrendingUp, BarChart3, Activity, Shield,
+  ArrowLeft, ExternalLink
 } from "lucide-react";
 
 interface Company {
@@ -26,6 +27,8 @@ interface Company {
     users: number;
     products: number;
   };
+  stores?: any[];
+  users?: any[];
 }
 
 interface User {
@@ -51,6 +54,9 @@ export default function SuperadminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Drill-down State
+  const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   
   // Data State
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -185,7 +191,7 @@ export default function SuperadminDashboard() {
         </button>
       </div>
 
-      {/* Sidebar - Clean Light Theme */}
+      {/* Sidebar */}
       <aside className={`fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-200 z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 shadow-xl lg:shadow-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8 hidden lg:block">
           <div className="flex items-center gap-3">
@@ -200,25 +206,25 @@ export default function SuperadminDashboard() {
 
         <nav className="flex-1 px-4 py-20 lg:py-4 space-y-2">
           <button 
-            onClick={() => { setActiveTab("companies"); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveTab("companies"); setViewingCompany(null); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "companies" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
           >
             <Building2 className="w-5 h-5" /> Companies
           </button>
           <button 
-            onClick={() => { setActiveTab("users"); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveTab("users"); setViewingCompany(null); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "users" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
           >
             <Users className="w-5 h-5" /> All Users
           </button>
           <button 
-            onClick={() => { setActiveTab("stats"); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveTab("stats"); setViewingCompany(null); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "stats" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
           >
             <LayoutDashboard className="w-5 h-5" /> Platform Stats
           </button>
           <button 
-            onClick={() => { setActiveTab("settings"); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveTab("settings"); setViewingCompany(null); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "settings" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
           >
             <Settings className="w-5 h-5" /> Global Settings
@@ -242,12 +248,23 @@ export default function SuperadminDashboard() {
       {/* Main Content */}
       <main className={`transition-all duration-300 ${isSidebarOpen ? 'lg:pl-64 blur-sm lg:blur-none' : 'lg:pl-64'} pt-16 lg:pt-0`}>
         <header className="px-6 lg:px-10 flex flex-col lg:flex-row items-center justify-between border-b border-slate-200 sticky top-16 lg:top-0 bg-white/80 backdrop-blur-md z-40 gap-4 py-6 lg:py-0 h-auto lg:h-20 shadow-sm lg:shadow-none">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 capitalize">{activeTab.replace("-", " ")} Management</h1>
-            <p className="text-sm text-slate-500">Manage platform-wide {activeTab}</p>
+          <div className="flex items-center gap-4">
+            {viewingCompany && (
+              <button onClick={() => setViewingCompany(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 capitalize">
+                {viewingCompany ? viewingCompany.name : `${activeTab.replace("-", " ")} Management`}
+              </h1>
+              <p className="text-sm text-slate-500">
+                {viewingCompany ? `Detailed view of ${viewingCompany.name}` : `Manage platform-wide ${activeTab}`}
+              </p>
+            </div>
           </div>
 
-          {(activeTab === "companies" || activeTab === "users") && (
+          {!viewingCompany && (activeTab === "companies" || activeTab === "users") && (
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -275,13 +292,112 @@ export default function SuperadminDashboard() {
             <div className="py-20 flex justify-center">
               <RefreshCw className="w-10 h-10 text-indigo-600 animate-spin" />
             </div>
+          ) : viewingCompany ? (
+            /* Company Drill-down View */
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                  {/* Company Info Card */}
+                  <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-6">
+                        <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center border border-slate-100">
+                          <Building2 className="w-10 h-10 text-indigo-600" />
+                        </div>
+                        <div>
+                          <h2 className="text-3xl font-black text-slate-900">{viewingCompany.name}</h2>
+                          <p className="text-slate-500 flex items-center gap-2 mt-1">
+                            <Globe className="w-4 h-4" /> {viewingCompany.email || 'No business email'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest ${
+                        viewingCompany.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
+                      }`}>
+                        {viewingCompany.status}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 border-t border-slate-100">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 text-slate-600">
+                          <div className="p-2 bg-slate-50 rounded-lg"><Phone className="w-4 h-4" /></div>
+                          <span className="text-sm font-medium">{viewingCompany.phone || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-slate-600">
+                          <div className="p-2 bg-slate-50 rounded-lg"><MapPin className="w-4 h-4" /></div>
+                          <span className="text-sm font-medium leading-relaxed">{viewingCompany.address || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 flex flex-col justify-center">
+                        <p className="text-[10px] uppercase font-black text-indigo-400 mb-1">Company Secret Key</p>
+                        <p className="text-sm font-mono font-bold text-indigo-600 truncate">CPY-{viewingCompany.id.split('-')[0].toUpperCase()}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Company Stats Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Stores</p>
+                      <p className="text-3xl font-black text-slate-900">{viewingCompany._count?.stores || 0}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Employees</p>
+                      <p className="text-3xl font-black text-slate-900">{viewingCompany._count?.users || 0}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Products</p>
+                      <p className="text-3xl font-black text-slate-900">{viewingCompany._count?.products || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Quick Actions */}
+                  <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl">
+                    <h3 className="text-lg font-bold mb-6">Quick Actions</h3>
+                    <div className="space-y-3">
+                      <button className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group">
+                        <Edit3 className="w-4 h-4 group-hover:scale-110 transition-transform" /> Edit Company
+                      </button>
+                      <button className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group">
+                        <Store className="w-4 h-4 group-hover:scale-110 transition-transform" /> Manage Stores
+                      </button>
+                      <button className="w-full py-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2">
+                        <Trash2 className="w-4 h-4" /> Deactivate
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Meta Info */}
+                  <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Registry Details</p>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Joined</span>
+                        <span className="font-bold">{new Date(viewingCompany.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">ID</span>
+                        <span className="font-mono text-[10px] text-slate-400">{viewingCompany.id}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : activeTab === "companies" ? (
             /* Companies Grid */
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredData.map((company: any) => (
-                <div key={company.id} className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group cursor-pointer relative overflow-hidden shadow-sm">
+                <div 
+                  key={company.id} 
+                  onClick={() => setViewingCompany(company)}
+                  className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group cursor-pointer relative overflow-hidden shadow-sm"
+                >
                   <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+                    <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600" onClick={(e) => e.stopPropagation()}>
                       <MoreVertical className="w-5 h-5" />
                     </button>
                   </div>
@@ -499,7 +615,7 @@ export default function SuperadminDashboard() {
             </div>
           )}
 
-          {!loading && activeTab !== "stats" && activeTab !== "settings" && filteredData.length === 0 && (
+          {!loading && activeTab !== "stats" && activeTab !== "settings" && filteredData.length === 0 && !viewingCompany && (
             <div className="py-20 text-center">
               <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-slate-900">No data found</h3>
