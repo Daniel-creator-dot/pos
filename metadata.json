@@ -1,0 +1,5 @@
+{
+  "name": "SwiftPOS - Enterprise Point of Sale",
+  "description": "A modern, full-stack Point of Sale system with inventory management, real-time sales tracking, and role-based access control.",
+  "requestFramePermissions": []
+}

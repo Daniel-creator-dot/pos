@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum RoleName {
+  superadmin
+  admin
+  manager
+  cashier
+  storekeeper
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// Models
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  address   String?
+  logo      String?
+  status    String   @default("ACTIVE") // ACTIVE, SUSPENDED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stores    Store[]
+  users     User[]
+  products  Product[]
+  categories Category[]
+  suppliers Supplier[]
+  customers Customer[]
+  sales     Sale[]
+  purchases Purchase[]
+  smsLogs   SmsLog[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  roleId       String
+  storeId      String?
+  companyId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role           Role            @relation(fields: [roleId], references: [id])
+  store          Store?          @relation(fields: [storeId], references: [id])
+  company        Company?        @relation(fields: [companyId], references: [id])
+  stockMovements StockMovement[]
+  purchases      Purchase[]
+  sales          Sale[]
+
+  @@index([email])
+  @@index([companyId])
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        RoleName  @unique
+  description String?
+  permissions String    // JSON string of permissions
+  createdAt   DateTime  @default(now())
+  users       User[]
+
+  @@index([name])
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  settings  String?  // JSON string of settings
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company?    @relation(fields: [companyId], references: [id])
+  users       User[]
+  sales       Sale[]
+  smsLogs     SmsLog[]
+
+  // SMS Configuration
+  smsEnabled       Boolean  @default(false)
+  smsProvider      String?  // 'twilio', 'africas_talking', 'generic'
+  smsApiKey        String?
+  smsApiSecret     String?
+  smsSenderId      String?
+  smsEndpoint      String?  // Custom endpoint for generic providers
+
+  @@index([companyId])
+}
+
+model Product {
+  id                  String   @id @default(uuid())
+  name                String
+  barcode             String?  @unique
+  categoryId          String
+  companyId           String?
+  price               Float
+  cost                Float
+  stockQty            Int      @default(0)
+  lowStockThreshold   Int      @default(5)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  category       Category        @relation(fields: [categoryId], references: [id])
+  company        Company?        @relation(fields: [companyId], references: [id])
+  stockMovements StockMovement[]
+  purchaseItems  PurchaseItem[]
+  saleItems      SaleItem[]
+
+  @@index([barcode])
+  @@index([categoryId])
+  @@index([companyId])
+  @@index([name])
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    
+  description String?
+  companyId   String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company     Company?  @relation(fields: [companyId], references: [id])
+  products    Product[]
+
+  @@index([name])
+  @@index([companyId])
+  @@unique([name, companyId])
+}
+
+model StockMovement {
+  id        String            @id @default(uuid())
+  productId String
+  type      StockMovementType
+  qty       Int
+  reason    String?
+  userId    String
+  reference String?           // Reference to purchase/sale ID
+  createdAt DateTime          @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Supplier {
+  id        String     @id @default(uuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  companyId String?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  company   Company?   @relation(fields: [companyId], references: [id])
+  purchases Purchase[]
+
+  @@index([name])
+  @@index([companyId])
+}
+
+model Purchase {
+  id         String        @id @default(uuid())
+  supplierId String
+  userId     String
+  companyId  String?
+  total      Float
+  status     PurchaseStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  company       Company?       @relation(fields: [companyId], references: [id])
+  purchaseItems PurchaseItem[]
+
+  @@index([supplierId])
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PurchaseItem {
+  id         String @id @default(uuid())
+  purchaseId String
+  productId  String
+  qty        Int
+  unitCost   Float
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+model Sale {
+  id         String   @id @default(uuid())
+  userId     String
+  storeId    String
+  companyId  String?
+  total      Float
+  discount   Float    @default(0)
+  subtotal   Float
+  tax        Float    @default(0)
+  receiptNumber String?
+  createdAt  DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id])
+  store     Store      @relation(fields: [storeId], references: [id])
+  company   Company?   @relation(fields: [companyId], references: [id])
+  saleItems SaleItem[]
+  payments  Payment[]
+  receipt   Receipt?
+
+  @@index([userId])
+  @@index([storeId])
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([receiptNumber])
+}
+
+model SaleItem {
+  id        String @id @default(uuid())
+  saleId    String
+  productId String
+  qty       Int
+  unitPrice Float
+  subtotal  Float
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  saleId    String
+  method    PaymentMethod
+  amount    Float
+  reference String?       // Transaction reference for card/mobile
+  createdAt DateTime      @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([method])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  email     String?
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  @@index([phone])
+  @@index([email])
+  @@index([companyId])
+}
+
+model Receipt {
+  id            String   @id @default(uuid())
+  saleId        String   @unique
+  receiptNumber String   @unique
+  printedAt     DateTime @default(now())
+  format        String   @default("THERMAL") // THERMAL, PDF
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([receiptNumber])
+}
+
+model SmsLog {
+  id          String   @id @default(uuid())
+  storeId     String
+  companyId   String?
+  recipient   String
+  message     String
+  status      String   // 'pending', 'sent', 'failed'
+  type        String   // 'receipt', 'campaign', 'notification'
+  reference   String?  // Reference to sale/campaign ID
+  error       String?
+  createdAt   DateTime @default(now())
+
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([storeId])
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([type])
+}
+
