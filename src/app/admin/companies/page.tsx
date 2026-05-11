@@ -76,7 +76,7 @@ export default function SuperadminDashboard() {
   
   // Form States
   const [companyForm, setCompanyForm] = useState({ name: "", email: "", phone: "", address: "" });
-  const [userForm, setUserForm] = useState({ name: "", email: "", password: "", roleId: "", companyId: "" });
+  const [userForm, setUserForm] = useState({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "" });
   const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function SuperadminDashboard() {
       });
       if (res.ok) {
         setIsUserModalOpen(false);
-        setUserForm({ name: "", email: "", password: "", roleId: "", companyId: "" });
+        setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "" });
         fetchData();
       }
     } catch (err) {
@@ -683,6 +683,7 @@ export default function SuperadminDashboard() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
                   <input required type="password" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} />
+                  <p className="text-[10px] text-slate-400 ml-1 italic">Default: zxcv123$$</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
