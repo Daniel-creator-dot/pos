@@ -360,16 +360,16 @@ export default function SuperadminDashboard() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-zinc-300">
                             <Building2 className="w-3.5 h-3.5 text-zinc-500" />
-                            <span className="text-sm font-medium">{user.company.name}</span>
+                            <span className="text-sm font-medium">{user.company?.name || 'N/A'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            user.role.name === 'admin' ? 'bg-amber-500/10 text-amber-500' : 
-                            user.role.name === 'superadmin' ? 'bg-indigo-500/10 text-indigo-400' :
+                            user.role?.name === 'admin' ? 'bg-amber-500/10 text-amber-500' : 
+                            user.role?.name === 'superadmin' ? 'bg-indigo-500/10 text-indigo-400' :
                             'bg-zinc-800 text-zinc-400'
                           }`}>
-                            {user.role.name}
+                            {user.role?.name || 'Unknown'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-zinc-500">
@@ -404,9 +404,9 @@ export default function SuperadminDashboard() {
                   { label: "Total Stores", value: platformStats.totalStores, icon: Store, color: "amber" },
                   { label: "Total Products", value: platformStats.totalProducts, icon: ShoppingBag, color: "purple" }
                 ].map((stat, idx) => (
-                  <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2rem] hover:border-zinc-700 transition-all">
-                    <div className={`w-12 h-12 bg-${stat.color}-500/10 rounded-2xl flex items-center justify-center mb-4`}>
-                      <stat.icon className={`w-6 h-6 text-${stat.color}-400`} />
+                  <div key={idx} className={`bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2rem] hover:border-zinc-700 transition-all`}>
+                    <div className={`w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4`}>
+                      <stat.icon className={`w-6 h-6 text-indigo-400`} />
                     </div>
                     <p className="text-sm font-medium text-zinc-500">{stat.label}</p>
                     <p className="text-3xl font-black text-white mt-1">{stat.value.toLocaleString()}</p>
