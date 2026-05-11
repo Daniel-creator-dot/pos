@@ -44,7 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (session.user.role.name !== "admin" && session.user.role.name !== "manager") {
+    if (
+      session.user.role.name !== "admin" && 
+      session.user.role.name !== "manager" &&
+      session.user.role.name !== "superadmin"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

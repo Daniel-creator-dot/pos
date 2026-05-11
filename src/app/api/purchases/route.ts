@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     if (
       session.user.role.name !== "admin" &&
       session.user.role.name !== "manager" &&
-      session.user.role.name !== "storekeeper"
+      session.user.role.name !== "storekeeper" &&
+      session.user.role.name !== "superadmin"
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

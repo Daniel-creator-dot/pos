@@ -11,8 +11,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only admin can view SMS logs
-    if (session.user.role.name !== "admin") {
+    // Only admin or superadmin can view SMS logs
+    if (session.user.role.name !== "admin" && session.user.role.name !== "superadmin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -110,7 +110,11 @@ export async function POST(request: Request) {
     // Check if this is a campaign (multiple recipients) or single SMS
     if (recipients && Array.isArray(recipients)) {
       // Campaign
-      if (session.user.role.name !== "admin" && session.user.role.name !== "manager") {
+      if (
+        session.user.role.name !== "admin" && 
+        session.user.role.name !== "manager" &&
+        session.user.role.name !== "superadmin"
+      ) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
