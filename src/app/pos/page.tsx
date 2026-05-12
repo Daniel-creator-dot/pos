@@ -19,6 +19,8 @@ import {
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { formatCurrency } from "@/lib/currency";
+import { db } from "@/lib/db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 interface Product {
   id: string;
@@ -57,25 +59,67 @@ export default function POSPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [currency, setCurrency] = useState("USD");
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Fetch settings and products
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Fetch settings and products with offline caching
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [settingsRes, productsRes] = await Promise.all([
-          fetch("/api/settings"),
-          fetch("/api/products"),
-        ]);
+        // Load from local DB first for instant UI
+        const localSettings = await db.settings.get("currency");
+        if (localSettings) setCurrency(localSettings.value);
 
-        if (settingsRes.ok) {
-          const data = await settingsRes.json();
-          setCurrency(data.currency || "USD");
+        const localProducts = await db.products.toArray();
+        if (localProducts.length > 0) {
+          const formatted = localProducts.map(p => ({
+            ...p,
+            category: p.categoryName ? { name: p.categoryName } : null
+          }));
+          setProducts(formatted);
+          setFilteredProducts(formatted);
         }
 
-        if (productsRes.ok) {
+        // Attempt to refresh from server
+        const [settingsRes, productsRes] = await Promise.all([
+          fetch("/api/settings").catch(() => null),
+          fetch("/api/products").catch(() => null),
+        ]);
+
+        if (settingsRes?.ok) {
+          const data = await settingsRes.json();
+          setCurrency(data.currency || "USD");
+          await db.settings.put({ key: "currency", value: data.currency || "USD" });
+        }
+
+        if (productsRes?.ok) {
           const data = await productsRes.json();
           setProducts(data);
           setFilteredProducts(data);
+          
+          // Update local cache
+          await db.products.clear();
+          await db.products.bulkPut(data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            barcode: p.barcode,
+            price: Number(p.price),
+            stockQty: Number(p.stockQty),
+            lowStockThreshold: Number(p.lowStockThreshold),
+            categoryName: p.category?.name || null,
+            updatedAt: Date.now()
+          })));
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -86,6 +130,51 @@ export default function POSPage() {
 
     fetchData();
   }, []);
+
+  // Background Sync Effect
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const syncSales = async () => {
+      const pending = await db.salesQueue.where("status").equals("pending").toArray();
+      if (pending.length === 0) return;
+
+      console.log(`Syncing ${pending.length} pending sales...`);
+
+      for (const sale of pending) {
+        try {
+          await db.salesQueue.update(sale.id!, { status: 'syncing' });
+          
+          const response = await fetch("/api/sales", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sale.data),
+          });
+
+          if (response.ok) {
+            await db.salesQueue.delete(sale.id!);
+            console.log(`Synced sale ${sale.receiptNumber}`);
+          } else {
+            const error = await response.json();
+            await db.salesQueue.update(sale.id!, { 
+              status: 'pending', 
+              lastError: error.error || 'Server error',
+              retryCount: sale.retryCount + 1 
+            });
+          }
+        } catch (error) {
+          await db.salesQueue.update(sale.id!, { 
+            status: 'pending', 
+            retryCount: sale.retryCount + 1 
+          });
+        }
+      }
+    };
+
+    const timer = setInterval(syncSales, 10000); // Try every 10 seconds
+    syncSales(); // Also try immediately when coming online
+    return () => clearInterval(timer);
+  }, [isOnline]);
 
   // Focus barcode input on mount and after certain actions
   useEffect(() => {
@@ -185,39 +274,87 @@ export default function POSPage() {
 
     setProcessing(true);
 
+    const saleData = {
+      items: cart.map((item) => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        unitPrice: item.product.price,
+      })),
+      discount,
+      payments,
+      storeId: session?.user?.storeId,
+      userId: session?.user?.id,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Generate local temp receipt
+    const tempReceipt = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     try {
-      const response = await fetch("/api/sales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((item) => ({
-            productId: item.product.id,
-            quantity: item.quantity,
-            unitPrice: item.product.price,
-          })),
-          discount,
-          payments,
-          storeId: session?.user?.storeId,
-          userId: session?.user?.id,
-        }),
+      // Save to local queue first
+      await db.salesQueue.add({
+        receiptNumber: tempReceipt,
+        data: saleData,
+        status: 'pending',
+        retryCount: 0
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setLastSale(result);
-        setShowReceipt(true);
-        setIsPaymentModalOpen(false);
-        // Reset
-        setCart([]);
-        setPayments([]);
-        setDiscount(0);
+      // Attempt to sync immediately if online
+      if (isOnline) {
+        const response = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(saleData),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setLastSale(result);
+          // Delete from local queue as it's successfully synced
+          await db.salesQueue.where("receiptNumber").equals(tempReceipt).delete();
+        } else {
+          // Keep in queue, show local receipt
+          setLastSale({
+            ...saleData,
+            receiptNumber: tempReceipt,
+            saleItems: cart.map(item => ({
+              id: Math.random().toString(),
+              product: item.product,
+              qty: item.quantity,
+              subtotal: item.product.price * item.quantity
+            })),
+            subtotal,
+            discountAmount,
+            total,
+            createdAt: saleData.createdAt
+          });
+        }
       } else {
-        const error = await response.json();
-        alert(error.error || "Failed to complete sale");
+        // Offline: Show local receipt
+        setLastSale({
+          ...saleData,
+          receiptNumber: tempReceipt,
+          saleItems: cart.map(item => ({
+            id: Math.random().toString(),
+            product: item.product,
+            qty: item.quantity,
+            subtotal: item.product.price * item.quantity
+          })),
+          subtotal,
+          discountAmount,
+          total,
+          createdAt: saleData.createdAt
+        });
       }
+
+      setShowReceipt(true);
+      setIsPaymentModalOpen(false);
+      setCart([]);
+      setPayments([]);
+      setDiscount(0);
     } catch (error) {
       console.error("Sale error:", error);
-      alert("Failed to complete sale");
+      alert("Failed to save sale. Please check device storage.");
     } finally {
       setProcessing(false);
     }
@@ -477,6 +614,16 @@ export default function POSPage() {
         <div className="flex-1 flex flex-col">
           {/* Search & Barcode */}
           <div className="p-4 bg-white border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+               <div className="flex items-center gap-2">
+                 <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse'}`}></div>
+                 <span className={`text-xs font-bold uppercase tracking-wider ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
+                   {isOnline ? 'System Online' : 'System Offline (Local Mode)'}
+                 </span>
+               </div>
+               {/* Sync Status Badge */}
+               <SyncStatus />
+            </div>
             <div className="flex gap-3">
               <form onSubmit={handleBarcodeSubmit} className="flex-1">
                 <div className="relative">
@@ -653,3 +800,23 @@ export default function POSPage() {
     </AuthenticatedLayout>
   );
 }
+
+function SyncStatus() {
+  const pendingCount = useLiveQuery(() => db.salesQueue.where("status").equals("pending").count()) ?? 0;
+  const syncingCount = useLiveQuery(() => db.salesQueue.where("status").equals("syncing").count()) ?? 0;
+
+  if (pendingCount === 0 && syncingCount === 0) return null;
+
+  return (
+    <div className="flex items-center gap-3 bg-blue-50 px-4 py-1.5 rounded-full border border-blue-100 animate-in fade-in slide-in-from-top-2">
+      {syncingCount > 0 ? (
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Syncing Data...</span>
+        </div>
+      ) : (
+        <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">{pendingCount} Pending Sync</span>
+      )}
+    </div>
+  );
+}
