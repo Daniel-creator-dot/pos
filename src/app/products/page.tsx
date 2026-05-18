@@ -28,6 +28,11 @@ interface Product {
   stockQty: number;
   lowStockThreshold: number;
   isActive: boolean;
+  isPendingDelete?: boolean;
+  createdBy?: {
+    name: string;
+    role: { name: string };
+  } | null;
   category: {
     id: string;
     name: string;
@@ -168,8 +173,16 @@ export default function ProductsPage() {
       });
 
       if (response.ok) {
+        const result = await response.json();
         fetchData();
-        success("Product Deleted", "The product has been deleted successfully.");
+        if (result.pendingApproval) {
+          success(
+            "Deletion Requested",
+            "Your deletion request has been submitted for administrator approval."
+          );
+        } else {
+          success("Product Deleted", "The product has been deleted successfully.");
+        }
       } else {
         showError("Error", "Failed to delete product");
       }
@@ -292,8 +305,13 @@ export default function ProductsPage() {
           {/* Products Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="card">
-                <div className="p-4">
+              <div key={product.id} className={`card relative overflow-hidden transition-all duration-200 ${product.isPendingDelete ? "border-amber-200 bg-amber-50/20" : ""}`}>
+                {product.isPendingDelete && (
+                  <div className="absolute top-0 right-0 left-0 bg-amber-500 text-white text-[10px] font-bold text-center py-1 uppercase tracking-wider shadow-sm">
+                    Pending Delete Approval
+                  </div>
+                )}
+                <div className={`p-4 ${product.isPendingDelete ? "pt-7" : ""}`}>
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-gray-900 truncate">
@@ -307,13 +325,17 @@ export default function ProductsPage() {
                       <div className="flex items-center gap-1 ml-2">
                         <button
                           onClick={() => openEditModal(product)}
-                          className="p-1 text-gray-400 hover:text-primary-600"
+                          disabled={product.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${product.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-primary-600 hover:bg-gray-100"}`}
+                          title={product.isPendingDelete ? "Pending deletion approval" : "Edit"}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => confirmDelete(product.id)}
-                          className="p-1 text-gray-400 hover:text-red-600"
+                          disabled={product.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${product.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600 hover:bg-gray-100"}`}
+                          title={product.isPendingDelete ? "Pending deletion approval" : "Delete"}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -322,31 +344,38 @@ export default function ProductsPage() {
                   </div>
 
                   {product.barcode && (
-                    <p className="text-xs text-gray-500 mb-2">
+                    <p className="text-xs text-gray-500 mb-2 font-mono">
                       Barcode: {product.barcode}
                     </p>
                   )}
 
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-lg font-bold text-primary-600">
-                    {formatCurrency(product.price, currency)}
-                  </span>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-lg font-bold text-primary-600">
+                      {formatCurrency(product.price, currency)}
+                    </span>
                     <span
                       className={`text-xs px-2 py-1 rounded-full ${
                         product.stockQty <= product.lowStockThreshold
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
+                          ? "bg-red-100 text-red-700 font-medium"
+                          : "bg-green-100 text-green-700 font-medium"
                       }`}
                     >
                       Stock: {product.stockQty}
                     </span>
                   </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 flex justify-between">
-                  <span>Cost: {formatCurrency(product.cost, currency)}</span>
-                    <span>
-                      Added {format(new Date(product.createdAt), "MMM d")}
-                    </span>
+                  <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-400 flex flex-col gap-1">
+                    <div className="flex justify-between">
+                      <span>Cost: {formatCurrency(product.cost, currency)}</span>
+                      <span>
+                        Added {format(new Date(product.createdAt), "MMM d, yyyy")}
+                      </span>
+                    </div>
+                    {product.createdBy && (
+                      <div className="text-right italic">
+                        by {product.createdBy.name} ({product.createdBy.role?.name})
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -537,11 +566,15 @@ export default function ProductsPage() {
             setProductToDelete(null);
           }}
           onConfirm={handleDelete}
-          title="Delete Product"
-          message="Are you sure you want to delete this product? This action cannot be undone."
-          confirmText="Delete"
+          title={isAdmin ? "Delete Product" : "Request Product Deletion"}
+          message={
+            isAdmin
+              ? "Are you sure you want to delete this product? This action cannot be undone."
+              : "As a store manager, deleting this product requires administrator approval. A deletion request will be submitted to the administrator. Proceed?"
+          }
+          confirmText={isAdmin ? "Delete" : "Submit Request"}
           cancelText="Cancel"
-          type="danger"
+          type={isAdmin ? "danger" : "warning"}
           isLoading={isDeleting}
         />
       </div>

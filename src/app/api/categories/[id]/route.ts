@@ -100,7 +100,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/categories/[id] - Delete a category (soft delete)
+// DELETE /api/categories/[id] - Delete a category (soft delete or queue for approval)
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
@@ -134,15 +134,40 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Soft delete by setting isActive to false
-    await prisma.category.update({
-      where: { id: params.id },
-      data: {
-        isActive: false,
-      },
-    });
+    const isAdmin = session.user.role.name === "admin" || session.user.role.name === "superadmin";
 
-    return NextResponse.json({ success: true });
+    if (isAdmin) {
+      // Admins/Superadmins soft-delete directly
+      await prisma.category.update({
+        where: { id: params.id },
+        data: {
+          isActive: false,
+          isPendingDelete: false,
+        },
+      });
+      return NextResponse.json({ success: true });
+    } else {
+      // Managers create a deletion request for admin approval
+      await prisma.$transaction([
+        prisma.category.update({
+          where: { id: params.id },
+          data: {
+            isPendingDelete: true,
+          },
+        }),
+        prisma.deletionRequest.create({
+          data: {
+            companyId: session.user.companyId || "",
+            resourceType: "CATEGORY",
+            resourceId: params.id,
+            resourceName: category.name,
+            requestedById: session.user.id,
+            status: "PENDING",
+          },
+        }),
+      ]);
+      return NextResponse.json({ success: true, pendingApproval: true });
+    }
   } catch (error) {
     console.error("Category API Error:", error);
     return NextResponse.json(

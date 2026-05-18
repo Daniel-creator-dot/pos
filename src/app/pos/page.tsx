@@ -105,12 +105,14 @@ export default function POSPage() {
 
         if (productsRes?.ok) {
           const data = await productsRes.json();
-          setProducts(data);
-          setFilteredProducts(data);
+          // Filter out products pending deletion so they cannot be sold
+          const activeProducts = data.filter((p: any) => !p.isPendingDelete);
+          setProducts(activeProducts);
+          setFilteredProducts(activeProducts);
           
           // Update local cache
           await db.products.clear();
-          await db.products.bulkPut(data.map((p: any) => ({
+          await db.products.bulkPut(activeProducts.map((p: any) => ({
             id: p.id,
             name: p.name,
             barcode: p.barcode,

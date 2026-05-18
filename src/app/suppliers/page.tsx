@@ -15,6 +15,11 @@ interface Supplier {
   email: string | null;
   address: string | null;
   isActive: boolean;
+  isPendingDelete?: boolean;
+  createdBy?: {
+    name: string;
+    role: { name: string };
+  } | null;
 }
 
 export default function SuppliersPage() {
@@ -108,8 +113,16 @@ export default function SuppliersPage() {
         method: "DELETE",
       });
       if (response.ok) {
+        const result = await response.json();
         fetchSuppliers();
-        success("Supplier Deleted", "The supplier has been deleted successfully.");
+        if (result.pendingApproval) {
+          success(
+            "Deletion Requested",
+            "Your deletion request has been submitted for administrator approval."
+          );
+        } else {
+          success("Supplier Deleted", "The supplier has been deleted successfully.");
+        }
       } else {
         showError("Error", "Failed to delete supplier");
       }
@@ -182,8 +195,13 @@ export default function SuppliersPage() {
         <main className="p-6 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {suppliers.map((supplier) => (
-              <div key={supplier.id} className="card">
-                <div className="p-4">
+              <div key={supplier.id} className={`card relative overflow-hidden transition-all duration-200 ${supplier.isPendingDelete ? "border-amber-200 bg-amber-50/20" : ""}`}>
+                {supplier.isPendingDelete && (
+                  <div className="absolute top-0 right-0 left-0 bg-amber-500 text-white text-[10px] font-bold text-center py-1 uppercase tracking-wider shadow-sm">
+                    Pending Delete Approval
+                  </div>
+                )}
+                <div className={`p-4 ${supplier.isPendingDelete ? "pt-7" : ""}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">{supplier.name}</h3>
@@ -196,18 +214,27 @@ export default function SuppliersPage() {
                       {supplier.address && (
                         <p className="text-sm text-gray-500 mt-1">{supplier.address}</p>
                       )}
+                      {supplier.createdBy && (
+                        <p className="italic text-[10px] text-gray-400 mt-2">
+                          Added by {supplier.createdBy.name} ({supplier.createdBy.role?.name})
+                        </p>
+                      )}
                     </div>
                     {canEdit && (
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openEditModal(supplier)}
-                          className="p-1 text-gray-400 hover:text-primary-600"
+                          disabled={supplier.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${supplier.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-primary-600 hover:bg-gray-100"}`}
+                          title={supplier.isPendingDelete ? "Pending deletion approval" : "Edit"}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => confirmDelete(supplier.id)}
-                          className="p-1 text-gray-400 hover:text-red-600"
+                          disabled={supplier.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${supplier.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600 hover:bg-gray-100"}`}
+                          title={supplier.isPendingDelete ? "Pending deletion approval" : "Delete"}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -326,11 +353,15 @@ export default function SuppliersPage() {
             setSupplierToDelete(null);
           }}
           onConfirm={handleDelete}
-          title="Delete Supplier"
-          message="Are you sure you want to delete this supplier? This action cannot be undone."
-          confirmText="Delete"
+          title={isAdmin ? "Delete Supplier" : "Request Supplier Deletion"}
+          message={
+            isAdmin
+              ? "Are you sure you want to delete this supplier? This action cannot be undone."
+              : "As a store manager/storekeeper, deleting this supplier requires administrator approval. A deletion request will be submitted to the administrator. Proceed?"
+          }
+          confirmText={isAdmin ? "Delete" : "Submit Request"}
           cancelText="Cancel"
-          type="danger"
+          type={isAdmin ? "danger" : "warning"}
           isLoading={isDeleting}
         />
       </div>

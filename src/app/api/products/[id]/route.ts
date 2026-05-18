@@ -82,7 +82,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/products/[id] - Delete a product (soft delete)
+// DELETE /api/products/[id] - Delete a product (soft delete or queue for approval)
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
@@ -93,18 +93,59 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (session.user.role.name !== "admin" && session.user.role.name !== "manager") {
+    if (
+      session.user.role.name !== "admin" &&
+      session.user.role.name !== "manager" &&
+      session.user.role.name !== "superadmin"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await prisma.product.update({
-      where: { id: params.id },
-      data: {
-        isActive: false,
-      },
+    const product = await prisma.product.findUnique({
+      where: { id: params.id }
     });
 
-    return NextResponse.json({ success: true });
+    if (!product) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    const isAdmin = session.user.role.name === "admin" || session.user.role.name === "superadmin";
+
+    if (isAdmin) {
+      // Admins/Superadmins soft-delete directly
+      await prisma.product.update({
+        where: { id: params.id },
+        data: {
+          isActive: false,
+          isPendingDelete: false,
+        },
+      });
+      return NextResponse.json({ success: true });
+    } else {
+      // Managers create a deletion request for admin approval
+      await prisma.$transaction([
+        prisma.product.update({
+          where: { id: params.id },
+          data: {
+            isPendingDelete: true,
+          },
+        }),
+        prisma.deletionRequest.create({
+          data: {
+            companyId: session.user.companyId || "",
+            resourceType: "PRODUCT",
+            resourceId: params.id,
+            resourceName: product.name,
+            requestedById: session.user.id,
+            status: "PENDING",
+          },
+        }),
+      ]);
+      return NextResponse.json({ success: true, pendingApproval: true });
+    }
   } catch (error) {
     console.error("Product API Error:", error);
     return NextResponse.json(

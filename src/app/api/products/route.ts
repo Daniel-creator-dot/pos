@@ -22,6 +22,16 @@ export async function GET() {
             name: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: {
+              select: { name: true }
+            }
+          }
+        }
       },
       orderBy: {
         name: "asc",
@@ -68,6 +78,7 @@ export async function POST(request: Request) {
         stockQty: stockQty || 0,
         lowStockThreshold: lowStockThreshold || 5,
         companyId: session.user.companyId,
+        createdById: session.user.id,
       },
       include: {
         category: true,

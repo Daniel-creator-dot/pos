@@ -13,6 +13,11 @@ interface Category {
   name: string;
   description: string | null;
   isActive: boolean;
+  isPendingDelete?: boolean;
+  createdBy?: {
+    name: string;
+    role: { name: string };
+  } | null;
   _count: { products: number };
 }
 
@@ -112,8 +117,16 @@ export default function CategoriesPage() {
         method: "DELETE",
       });
       if (response.ok) {
+        const result = await response.json();
         fetchCategories();
-        success("Category Deleted", "The category has been deleted successfully.");
+        if (result.pendingApproval) {
+          success(
+            "Deletion Requested",
+            "Your deletion request has been submitted for administrator approval."
+          );
+        } else {
+          success("Category Deleted", "The category has been deleted successfully.");
+        }
       } else {
         showError("Error", "Failed to delete category");
       }
@@ -181,29 +194,43 @@ export default function CategoriesPage() {
         <main className="p-6 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((category) => (
-              <div key={category.id} className="card">
-                <div className="p-4">
+              <div key={category.id} className={`card relative overflow-hidden transition-all duration-200 ${category.isPendingDelete ? "border-amber-200 bg-amber-50/20" : ""}`}>
+                {category.isPendingDelete && (
+                  <div className="absolute top-0 right-0 left-0 bg-amber-500 text-white text-[10px] font-bold text-center py-1 uppercase tracking-wider shadow-sm">
+                    Pending Delete Approval
+                  </div>
+                )}
+                <div className={`p-4 ${category.isPendingDelete ? "pt-7" : ""}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">{category.name}</h3>
                       {category.description && (
                         <p className="text-sm text-gray-500 mt-1">{category.description}</p>
                       )}
-                      <p className="text-xs text-gray-500 mt-2">
-                        {category._count?.products || 0} products
-                      </p>
+                      <div className="flex flex-col gap-1 mt-2 text-xs text-gray-500">
+                        <span>{category._count?.products || 0} products</span>
+                        {category.createdBy && (
+                          <span className="italic text-[10px] text-gray-400">
+                            Added by {category.createdBy.name} ({category.createdBy.role?.name})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {canEdit && (
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openEditModal(category)}
-                          className="p-1 text-gray-400 hover:text-primary-600"
+                          disabled={category.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${category.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-primary-600 hover:bg-gray-100"}`}
+                          title={category.isPendingDelete ? "Pending deletion approval" : "Edit"}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => confirmDelete(category.id)}
-                          className="p-1 text-gray-400 hover:text-red-600"
+                          disabled={category.isPendingDelete}
+                          className={`p-1 rounded transition-colors ${category.isPendingDelete ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600 hover:bg-gray-100"}`}
+                          title={category.isPendingDelete ? "Pending deletion approval" : "Delete"}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -304,11 +331,15 @@ export default function CategoriesPage() {
             setCategoryToDelete(null);
           }}
           onConfirm={handleDelete}
-          title="Delete Category"
-          message="Are you sure you want to delete this category? This action cannot be undone."
-          confirmText="Delete"
+          title={isAdmin ? "Delete Category" : "Request Category Deletion"}
+          message={
+            isAdmin
+              ? "Are you sure you want to delete this category? This action cannot be undone."
+              : "As a store manager, deleting this category requires administrator approval. A deletion request will be submitted to the administrator. Proceed?"
+          }
+          confirmText={isAdmin ? "Delete" : "Submit Request"}
           cancelText="Cancel"
-          type="danger"
+          type={isAdmin ? "danger" : "warning"}
           isLoading={isDeleting}
         />
       </div>

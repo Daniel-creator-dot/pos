@@ -19,6 +19,18 @@ export async function GET() {
       orderBy: {
         name: "asc",
       },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: {
+              select: { name: true }
+            }
+          }
+        }
+      },
     });
 
     return NextResponse.json(suppliers);
@@ -59,6 +71,7 @@ export async function POST(request: Request) {
         email,
         address,
         companyId: session.user.companyId,
+        createdById: session.user.id,
       },
     });
 

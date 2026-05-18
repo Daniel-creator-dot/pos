@@ -55,6 +55,7 @@ model Company {
   sales     Sale[]
   purchases Purchase[]
   smsLogs   SmsLog[]
+  deletionRequests DeletionRequest[]
 }
 
 model User {
@@ -74,6 +75,12 @@ model User {
   stockMovements StockMovement[]
   purchases      Purchase[]
   sales          Sale[]
+
+  requestedDeletions DeletionRequest[] @relation("RequestedDeletions")
+  approvedDeletions  DeletionRequest[] @relation("ApprovedDeletions")
+  createdProducts    Product[]         @relation("ProductCreator")
+  createdCategories  Category[]        @relation("CategoryCreator")
+  createdSuppliers   Supplier[]        @relation("SupplierCreator")
 
   @@index([email])
   @@index([companyId])
@@ -127,11 +134,14 @@ model Product {
   stockQty            Int      @default(0)
   lowStockThreshold   Int      @default(5)
   isActive            Boolean  @default(true)
+  isPendingDelete     Boolean  @default(false)
+  createdById         String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   category       Category        @relation(fields: [categoryId], references: [id])
   company        Company?        @relation(fields: [companyId], references: [id])
+  createdBy      User?           @relation("ProductCreator", fields: [createdById], references: [id])
   stockMovements StockMovement[]
   purchaseItems  PurchaseItem[]
   saleItems      SaleItem[]
@@ -147,11 +157,14 @@ model Category {
   name        String    
   description String?
   companyId   String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive        Boolean   @default(true)
+  isPendingDelete Boolean   @default(false)
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   company     Company?  @relation(fields: [companyId], references: [id])
+  createdBy   User?     @relation("CategoryCreator", fields: [createdById], references: [id])
   products    Product[]
 
   @@index([name])
@@ -184,11 +197,14 @@ model Supplier {
   email     String?
   address   String?
   companyId String?
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  isActive        Boolean    @default(true)
+  isPendingDelete Boolean    @default(false)
+  createdById     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   company   Company?   @relation(fields: [companyId], references: [id])
+  createdBy User?      @relation("SupplierCreator", fields: [createdById], references: [id])
   purchases Purchase[]
 
   @@index([name])
@@ -334,5 +350,26 @@ model SmsLog {
   @@index([companyId])
   @@index([createdAt])
   @@index([type])
+}
+
+model DeletionRequest {
+  id            String   @id @default(uuid())
+  companyId     String
+  resourceType  String   // "PRODUCT", "CATEGORY", "SUPPLIER"
+  resourceId    String
+  resourceName  String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  requestedById String
+  approvedById  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id])
+  requestedBy User     @relation("RequestedDeletions", fields: [requestedById], references: [id])
+  approvedBy  User?    @relation("ApprovedDeletions", fields: [approvedById], references: [id])
+
+  @@index([companyId])
+  @@index([requestedById])
+  @@index([status])
 }
 

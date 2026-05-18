@@ -16,6 +16,7 @@ import {
   FileText,
   Database,
   Tag,
+  CheckSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { name: "Suppliers", href: "/suppliers", icon: Users, roles: ["admin", "manager", "storekeeper"] },
   { name: "Sales", href: "/sales", icon: FileText, roles: ["admin", "manager", "cashier"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "manager"] },
+  { name: "Approvals", href: "/approvals", icon: CheckSquare, roles: ["admin"] },
   { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];
@@ -44,6 +46,30 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Safely get user role
+  const userRole = session?.user?.role?.name || "";
+
+  useEffect(() => {
+    if (userRole === "admin" || userRole === "superadmin") {
+      const fetchCount = async () => {
+        try {
+          const res = await fetch("/api/approvals");
+          if (res.ok) {
+            const data = await res.json();
+            setPendingCount(data.length);
+          }
+        } catch (err) {
+          console.error("Failed to fetch approvals count:", err);
+        }
+      };
+
+      fetchCount();
+      const interval = setInterval(fetchCount, 20000); // refresh every 20s
+      return () => clearInterval(interval);
+    }
+  }, [userRole]);
 
   if (status === "loading") {
     return (
@@ -58,9 +84,6 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // Safely get user role
-  const userRole = session?.user?.role?.name || "";
-  
   const filteredNavItems = navItems.filter((item) =>
     item.roles.includes(userRole)
   );
@@ -116,8 +139,13 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                             : "text-gray-700 hover:bg-gray-100"
                         }`}
                       >
-                        <item.icon className="w-5 h-5" />
-                        {item.name}
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        <span className="flex-1">{item.name}</span>
+                        {item.name === "Approvals" && pendingCount > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.4)] animate-pulse">
+                            {pendingCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                   );

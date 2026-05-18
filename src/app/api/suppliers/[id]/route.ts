@@ -98,7 +98,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/suppliers/[id] - Delete a supplier (soft delete)
+// DELETE /api/suppliers/[id] - Delete a supplier (soft delete or queue for approval)
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
@@ -133,15 +133,40 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Soft delete by setting isActive to false
-    await prisma.supplier.update({
-      where: { id: params.id },
-      data: {
-        isActive: false,
-      },
-    });
+    const isAdmin = session.user.role.name === "admin" || session.user.role.name === "superadmin";
 
-    return NextResponse.json({ success: true });
+    if (isAdmin) {
+      // Admins/Superadmins soft-delete directly
+      await prisma.supplier.update({
+        where: { id: params.id },
+        data: {
+          isActive: false,
+          isPendingDelete: false,
+        },
+      });
+      return NextResponse.json({ success: true });
+    } else {
+      // Managers and Storekeepers create a deletion request for admin approval
+      await prisma.$transaction([
+        prisma.supplier.update({
+          where: { id: params.id },
+          data: {
+            isPendingDelete: true,
+          },
+        }),
+        prisma.deletionRequest.create({
+          data: {
+            companyId: session.user.companyId || "",
+            resourceType: "SUPPLIER",
+            resourceId: params.id,
+            resourceName: supplier.name,
+            requestedById: session.user.id,
+            status: "PENDING",
+          },
+        }),
+      ]);
+      return NextResponse.json({ success: true, pendingApproval: true });
+    }
   } catch (error) {
     console.error("Supplier API Error:", error);
     return NextResponse.json(

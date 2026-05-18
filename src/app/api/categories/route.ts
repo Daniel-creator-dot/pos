@@ -22,6 +22,16 @@ export async function GET() {
       include: {
         _count: {
           select: { products: true }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: {
+              select: { name: true }
+            }
+          }
         }
       },
     });
@@ -60,6 +70,7 @@ export async function POST(request: Request) {
         name,
         description,
         companyId: session.user.companyId,
+        createdById: session.user.id,
       },
     });
 
