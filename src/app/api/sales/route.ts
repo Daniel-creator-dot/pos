@@ -22,7 +22,17 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!storeId || !userId) {
+    let resolvedStoreId = storeId;
+    if (!resolvedStoreId && session.user.companyId) {
+      const companyStore = await prisma.store.findFirst({
+        where: { companyId: session.user.companyId }
+      });
+      if (companyStore) {
+        resolvedStoreId = companyStore.id;
+      }
+    }
+
+    if (!resolvedStoreId || !userId) {
       return NextResponse.json(
         { error: "Store and user information required" },
         { status: 400 }
@@ -80,7 +90,7 @@ export async function POST(request: Request) {
       const sale = await tx.sale.create({
         data: {
           userId,
-          storeId,
+          storeId: resolvedStoreId,
           companyId: session.user.companyId,
           subtotal,
           discount,
