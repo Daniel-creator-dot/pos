@@ -56,6 +56,9 @@ export default function POSPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
+  const [addingPaymentMethod, setAddingPaymentMethod] = useState<"CASH" | "CARD" | "MOBILE_MONEY" | null>(null);
+  const [paymentAmountInput, setPaymentAmountInput] = useState("");
+  const [momoPhoneInput, setMomoPhoneInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [currency, setCurrency] = useState("USD");
@@ -488,7 +491,12 @@ export default function POSPage() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Payment</h2>
                 <button
-                  onClick={() => setIsPaymentModalOpen(false)}
+                  onClick={() => {
+                    setIsPaymentModalOpen(false);
+                    setAddingPaymentMethod(null);
+                    setPaymentAmountInput("");
+                    setMomoPhoneInput("");
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-6 h-6" />
@@ -504,55 +512,113 @@ export default function POSPage() {
                 </div>
               </div>
 
-              <div className="space-y-4 mb-6">
-                <h3 className="font-medium text-gray-700">Payment Method</h3>
-                {[
-                  { id: "CASH", label: "Cash", icon: Banknote },
-                  { id: "CARD", label: "Card", icon: CreditCard },
-                  { id: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone },
-                ].map((method) => (
+              {addingPaymentMethod ? (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-gray-800">
+                      Add {addingPaymentMethod === "MOBILE_MONEY" ? "Mobile Money" : addingPaymentMethod === "CASH" ? "Cash" : "Card"} Payment
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingPaymentMethod(null);
+                        setPaymentAmountInput("");
+                        setMomoPhoneInput("");
+                      }}
+                      className="text-primary-600 hover:text-primary-700 text-sm font-semibold"
+                    >
+                      Back
+                    </button>
+                  </div>
+
+                  {addingPaymentMethod === "MOBILE_MONEY" && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 0244123456"
+                        value={momoPhoneInput}
+                        onChange={(e) => setMomoPhoneInput(e.target.value)}
+                        className="input w-full"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                      Amount ({currency}) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={paymentAmountInput}
+                      onChange={(e) => setPaymentAmountInput(e.target.value)}
+                      className="input w-full"
+                      autoFocus={addingPaymentMethod !== "MOBILE_MONEY"}
+                    />
+                  </div>
+
                   <button
-                    key={method.id}
-                    onClick={async () => {
-                      if (method.id === "MOBILE_MONEY") {
-                        // For Mobile Money, ask for phone number and amount
-                        const phoneNumber = prompt("Enter Mobile Money phone number:") || "";
-                        if (!phoneNumber) return;
-                        const amount = parseFloat(
-                          prompt(`Enter ${method.label} amount:`) || "0"
-                        );
-                        if (amount > 0) {
-                          setPayments((prev) => [
-                            ...prev,
-                            {
-                              method: method.id as Payment["method"],
-                              amount,
-                              reference: phoneNumber,
-                            },
-                          ]);
-                        }
-                      } else {
-                        const amount = parseFloat(
-                          prompt(`Enter ${method.label} amount:`) || "0"
-                        );
-                        if (amount > 0) {
-                          setPayments((prev) => [
-                            ...prev,
-                            {
-                              method: method.id as Payment["method"],
-                              amount,
-                            },
-                          ]);
-                        }
+                    type="button"
+                    onClick={() => {
+                      const amt = parseFloat(paymentAmountInput);
+                      if (isNaN(amt) || amt <= 0) {
+                        alert("Please enter a valid amount greater than 0");
+                        return;
                       }
+                      if (addingPaymentMethod === "MOBILE_MONEY" && !momoPhoneInput.trim()) {
+                        alert("Please enter a Mobile Money phone number");
+                        return;
+                      }
+
+                      setPayments((prev) => [
+                        ...prev,
+                        {
+                          method: addingPaymentMethod,
+                          amount: amt,
+                          ...(addingPaymentMethod === "MOBILE_MONEY" ? { reference: momoPhoneInput.trim() } : {}),
+                        },
+                      ]);
+
+                      // Reset state
+                      setAddingPaymentMethod(null);
+                      setPaymentAmountInput("");
+                      setMomoPhoneInput("");
                     }}
-                    className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
+                    className="btn btn-primary w-full py-2.5"
                   >
-                    <method.icon className="w-6 h-6 text-gray-600" />
-                    <span className="font-medium">{method.label}</span>
+                    Confirm Payment
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-4 mb-6">
+                  <h3 className="font-medium text-gray-700">Payment Method</h3>
+                  {[
+                    { id: "CASH", label: "Cash", icon: Banknote },
+                    { id: "CARD", label: "Card", icon: CreditCard },
+                    { id: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone },
+                  ].map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => {
+                        setAddingPaymentMethod(method.id as "CASH" | "CARD" | "MOBILE_MONEY");
+                        // Autofill remaining amount to pay
+                        const paidSoFar = payments.reduce((sum, p) => sum + p.amount, 0);
+                        const remaining = Math.max(0, total - paidSoFar);
+                        setPaymentAmountInput(remaining > 0 ? remaining.toFixed(2) : "");
+                      }}
+                      className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left"
+                    >
+                      <method.icon className="w-6 h-6 text-gray-600" />
+                      <span className="font-medium">{method.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {payments.length > 0 && (
                 <div className="mb-6">
@@ -788,7 +854,12 @@ export default function POSPage() {
             </div>
 
             <button
-              onClick={() => setIsPaymentModalOpen(true)}
+              onClick={() => {
+                setAddingPaymentMethod(null);
+                setPaymentAmountInput("");
+                setMomoPhoneInput("");
+                setIsPaymentModalOpen(true);
+              }}
               disabled={cart.length === 0}
               className="btn btn-primary w-full h-12 text-lg font-medium"
             >
