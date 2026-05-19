@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
 
 // GET /api/products/[id] - Get a single product
 export async function GET(
@@ -13,6 +12,8 @@ export async function GET(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { prisma } = await import("@/lib/prisma");
 
     const product = await prisma.product.findUnique({
       where: { id: params.id },
@@ -29,10 +30,10 @@ export async function GET(
     }
 
     return NextResponse.json(product);
-  } catch (error) {
-    console.error("Product API Error:", error);
+  } catch (error: any) {
+    console.error("Product GET Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch product" },
+      { error: error?.message || "Failed to fetch product" },
       { status: 500 }
     );
   }
@@ -54,7 +55,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, barcode, categoryId, price, cost, stockQty, lowStockThreshold } = body;
+    const { name, categoryId, price, cost, stockQty, lowStockThreshold } = body;
+    const barcode = body.barcode?.trim() || null;
+
+    const { prisma } = await import("@/lib/prisma");
 
     const product = await prisma.product.update({
       where: { id: params.id },
@@ -62,10 +66,10 @@ export async function PUT(
         name,
         barcode,
         categoryId,
-        price,
-        cost,
-        stockQty,
-        lowStockThreshold,
+        price: Number(price) || 0,
+        cost: Number(cost) || 0,
+        stockQty: Number(stockQty) || 0,
+        lowStockThreshold: Number(lowStockThreshold) || 5,
       },
       include: {
         category: true,
@@ -73,10 +77,10 @@ export async function PUT(
     });
 
     return NextResponse.json(product);
-  } catch (error) {
-    console.error("Product API Error:", error);
+  } catch (error: any) {
+    console.error("Product PUT Error:", error);
     return NextResponse.json(
-      { error: "Failed to update product" },
+      { error: error?.message || "Failed to update product" },
       { status: 500 }
     );
   }
@@ -100,6 +104,8 @@ export async function DELETE(
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    const { prisma } = await import("@/lib/prisma");
 
     const product = await prisma.product.findUnique({
       where: { id: params.id }
@@ -146,10 +152,10 @@ export async function DELETE(
       ]);
       return NextResponse.json({ success: true, pendingApproval: true });
     }
-  } catch (error) {
-    console.error("Product API Error:", error);
+  } catch (error: any) {
+    console.error("Product DELETE Error:", error);
     return NextResponse.json(
-      { error: "Failed to delete product" },
+      { error: error?.message || "Failed to delete product" },
       { status: 500 }
     );
   }
