@@ -20,11 +20,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only admin can access settings
-    if (session.user.role.name !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const { prisma } = await import("@/lib/prisma");
 
     // Get the store settings
