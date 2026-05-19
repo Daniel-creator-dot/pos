@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
 
 // POST /api/sales - Create a new sale
 export async function POST(request: Request) {
@@ -10,6 +9,8 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { prisma } = await import("@/lib/prisma");
 
     const body = await request.json();
     const { items, discount, payments, storeId, userId } = body;
@@ -165,6 +166,8 @@ export async function GET(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { prisma } = await import("@/lib/prisma");
 
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
