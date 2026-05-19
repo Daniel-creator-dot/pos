@@ -67,7 +67,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, barcode, categoryId, price, cost, stockQty, lowStockThreshold } = body;
+    const { name, categoryId, price, cost, stockQty, lowStockThreshold } = body;
+    // Convert empty barcode string to null to avoid unique constraint violation
+    const barcode = body.barcode?.trim() || null;
 
     const { prisma } = await import("@/lib/prisma");
 
@@ -76,10 +78,10 @@ export async function POST(request: Request) {
         name,
         barcode,
         categoryId,
-        price,
-        cost,
-        stockQty: stockQty || 0,
-        lowStockThreshold: lowStockThreshold || 5,
+        price: Number(price) || 0,
+        cost: Number(cost) || 0,
+        stockQty: Number(stockQty) || 0,
+        lowStockThreshold: Number(lowStockThreshold) || 5,
         companyId: session.user.companyId,
         createdById: session.user.id,
       },
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
         data: {
           productId: product.id,
           type: "IN",
-          qty: stockQty,
+          qty: Number(stockQty),
           reason: "Initial stock",
           userId: session.user.id,
         },
@@ -102,10 +104,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(product, { status: 201 });
-  } catch (error) {
-    console.error("Products API Error:", error);
+  } catch (error: any) {
+    console.error("Products POST Error:", error);
+    const message = error?.message || "Failed to create product";
     return NextResponse.json(
-      { error: "Failed to create product" },
+      { error: message },
       { status: 500 }
     );
   }
