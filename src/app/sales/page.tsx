@@ -206,6 +206,69 @@ export default function SalesHistoryPage() {
               </div>
             </div>
           </div>
+
+          {/* Print-only thermal receipt container */}
+          <div className="receipt-print hidden print:block bg-white p-4 font-mono text-sm text-gray-900">
+            <div className="text-center mb-4">
+              <p className="font-bold text-lg">SwiftPOS</p>
+              <p className="text-xs text-gray-500">
+                Receipt: {selectedSale.receiptNumber}
+              </p>
+              <p className="text-xs text-gray-500">
+                {format(new Date(selectedSale.createdAt), "MMM d, yyyy h:mm a")}
+              </p>
+            </div>
+
+            <div className="border-t border-b border-gray-300 py-2 mb-2">
+              {selectedSale.saleItems.map((item) => (
+                <div key={item.id} className="flex justify-between py-1">
+                  <span>
+                    {item.product.name} x{item.qty}
+                  </span>
+                  <span>{formatCurrency(item.subtotal, currency)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(selectedSale.subtotal, currency)}</span>
+              </div>
+              {selectedSale.discount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>Discount ({selectedSale.discount}%):</span>
+                  <span>-{formatCurrency(selectedSale.subtotal * selectedSale.discount / 100, currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1 mt-1">
+                <span>Total:</span>
+                <span>{formatCurrency(selectedSale.total, currency)}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-300 mt-2 pt-2">
+              {selectedSale.payments.map((payment) => (
+                <div key={payment.id} className="flex justify-between text-xs">
+                  <span>
+                    {payment.method === "MOBILE_MONEY" 
+                      ? `Mobile Money (${payment.reference || ""})` 
+                      : payment.method.replace("_", " ")}:
+                  </span>
+                  <span>{formatCurrency(payment.amount, currency)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between font-bold mt-1 text-sm">
+                <span>Change:</span>
+                <span>
+                  {formatCurrency(
+                    selectedSale.payments.reduce((s, p) => s + p.amount, 0) - selectedSale.total,
+                    currency
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
       </AuthenticatedLayout>
