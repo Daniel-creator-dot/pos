@@ -48,9 +48,29 @@ export async function POST(request: Request) {
       }
     });
 
-    // 5. Build and send SMS message via Intek SMS API
+    // 5. Look up the store's SMS sender ID from database config
+    let smsSenderName = "Swiftpos"; // default
+    if (user.storeId) {
+      const store = await prisma.store.findUnique({
+        where: { id: user.storeId },
+        select: { smsSenderId: true }
+      });
+      if (store?.smsSenderId) {
+        smsSenderName = store.smsSenderId;
+      }
+    } else if (user.companyId) {
+      const store = await prisma.store.findFirst({
+        where: { companyId: user.companyId },
+        select: { smsSenderId: true }
+      });
+      if (store?.smsSenderId) {
+        smsSenderName = store.smsSenderId;
+      }
+    }
+
+    // 6. Build and send SMS message via Intek SMS API
     const message = `SwiftPOS Security Alert: Your password reset verification code is ${otpCode}. It is valid for 10 minutes.`;
-    const smsResult = await sendIntekSms(recipientPhone, message);
+    const smsResult = await sendIntekSms(recipientPhone, message, smsSenderName);
 
     // 6. Create SMS log in the database
     try {
