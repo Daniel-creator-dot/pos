@@ -76,52 +76,38 @@ export default function LoginPage() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-15 animate-pulse" style={{ animationDelay: "3s" }}></div>
 
-        <div className="relative z-10 max-w-lg space-y-10">
-          {/* Badge */}
-          <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-sm font-medium animate-fade-in shadow-inner">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-            <span className="text-primary-100">SwiftPOS Version 2.0</span>
-          </div>
-
-          {/* Headline */}
-          <div className="space-y-4">
-            <h2 className="text-4xl font-extrabold tracking-tight leading-tight lg:text-5xl text-white">
-              Empowering Your Retail Business
-            </h2>
-            <p className="text-lg text-primary-200/90 font-light leading-relaxed">
-              Manage transactions, track inventory, and grow your sales with our elegant, lightning-fast point of sale system.
-            </p>
-          </div>
-
-          {/* Showcase Feature List */}
-          <div className="space-y-4 pt-6">
-            <div className="flex items-start space-x-3 bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-all duration-200">
-              <div className="p-2 bg-primary-500/20 rounded-lg text-primary-300">
-                <Package className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Instant Inventory Sync</h4>
-                <p className="text-sm text-primary-200/80 mt-0.5">Real-time stock updates across all store registers and locations.</p>
-              </div>
+        <div className="relative z-10 w-full max-w-lg flex flex-col justify-between h-full max-h-[85%] space-y-8">
+          {/* Top Brand Indicator */}
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/25 shadow-inner">
+              <Package className="w-5 h-5 text-white" />
             </div>
-
-            <div className="flex items-start space-x-3 bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-all duration-200">
-              <div className="p-2 bg-primary-500/20 rounded-lg text-primary-300">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Advanced Sales Analytics</h4>
-                <p className="text-sm text-primary-200/80 mt-0.5">Gain key insights into sales, margins, and popular categories instantly.</p>
-              </div>
+            <div>
+              <span className="font-bold text-lg tracking-tight block leading-none">SwiftPOS</span>
+              <span className="text-xs text-primary-200 font-medium">Enterprise Retail Suite</span>
             </div>
           </div>
 
-          {/* Footer badge */}
-          <div className="pt-6 border-t border-white/10 flex items-center justify-between text-xs text-primary-300">
+          {/* POS Image Showcase Container */}
+          <div className="relative group flex-grow flex items-center justify-center my-6">
+            {/* Ambient glow behind image */}
+            <div className="absolute -inset-2 bg-gradient-to-r from-primary-500 to-blue-500 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+            
+            {/* Device mock structure */}
+            <div className="relative w-full bg-primary-950/40 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-2xl hover:scale-[1.02] transition-all duration-500 ease-out overflow-hidden aspect-[4/3] flex items-center justify-center">
+              <img
+                src="/pos_terminal.png"
+                alt="SwiftPOS Terminal Showcase"
+                className="w-full h-full object-cover rounded-xl select-none"
+                draggable={false}
+              />
+            </div>
+          </div>
+
+          {/* Clean minimal footer */}
+          <div className="flex items-center justify-between text-xs text-primary-300 border-t border-white/10 pt-6">
             <span>© 2026 SwiftPOS Systems</span>
-            <span>Secure Enterprise Terminal</span>
+            <span>All System Services Active</span>
           </div>
         </div>
       </div>
