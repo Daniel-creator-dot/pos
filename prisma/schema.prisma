@@ -81,6 +81,7 @@ model User {
   createdProducts    Product[]         @relation("ProductCreator")
   createdCategories  Category[]        @relation("CategoryCreator")
   createdSuppliers   Supplier[]        @relation("SupplierCreator")
+  otpTokens          OtpToken[]
 
   @@index([email])
   @@index([companyId])
@@ -371,5 +372,20 @@ model DeletionRequest {
   @@index([companyId])
   @@index([requestedById])
   @@index([status])
+}
+
+model OtpToken {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String   // Plain text OTP code (e.g., 6 digits)
+  type      String   @default("PASSWORD_RESET") // PASSWORD_RESET, etc.
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
 }
 
