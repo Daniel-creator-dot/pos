@@ -33,7 +33,7 @@ export async function sendIntekSms(to: string, message: string, senderName: stri
         "Accept": "application/json"
       },
       body: JSON.stringify({
-        recipient: formattedRecipient,
+        recipients: [formattedRecipient],
         message: message,
         sender: senderName // Approved sender name registered with Intek
       })
@@ -49,8 +49,8 @@ export async function sendIntekSms(to: string, message: string, senderName: stri
     console.log("[IntekSMS] API Response:", data);
 
     // According to Intek API, look for success response indicators
-    if (data.status === "success" || data.id || data.success || data.code === 200) {
-      return { success: true, messageId: data.id || data.message_id || String(data.code) };
+    if (data.ok === true || data.status === "success" || data.id || data.success || data.code === 200) {
+      return { success: true, messageId: String(data.data?.campaign_id || data.id || data.message_id || data.code || "") };
     }
 
     return { success: false, error: data.message || "Failed to deliver SMS via Intek" };
