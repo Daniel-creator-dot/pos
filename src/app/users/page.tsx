@@ -46,7 +46,9 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const isAdmin = session?.user?.role?.name === "admin";
+  const isAdmin =
+    session?.user?.role?.name === "admin" ||
+    session?.user?.role?.name === "superadmin";
 
   useEffect(() => {
     if (isAdmin) {
