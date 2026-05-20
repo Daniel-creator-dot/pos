@@ -28,18 +28,18 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["admin", "manager"] },
-  { name: "POS", href: "/pos", icon: ShoppingCart, roles: ["admin", "manager", "cashier"] },
-  { name: "Products", href: "/products", icon: Package, roles: ["admin", "manager", "storekeeper"] },
-  { name: "Categories", href: "/categories", icon: Tag, roles: ["admin", "manager"] },
-  { name: "Stock", href: "/stock", icon: Database, roles: ["admin", "manager", "storekeeper"] },
-  { name: "Purchases", href: "/purchases", icon: Truck, roles: ["admin", "manager", "storekeeper"] },
-  { name: "Suppliers", href: "/suppliers", icon: Users, roles: ["admin", "manager", "storekeeper"] },
-  { name: "Sales", href: "/sales", icon: FileText, roles: ["admin", "manager", "cashier"] },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "manager"] },
-  { name: "Approvals", href: "/approvals", icon: CheckSquare, roles: ["admin"] },
-  { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
-  { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["admin", "superadmin", "manager"] },
+  { name: "POS", href: "/pos", icon: ShoppingCart, roles: ["admin", "superadmin", "manager", "cashier"] },
+  { name: "Products", href: "/products", icon: Package, roles: ["admin", "superadmin", "manager", "storekeeper"] },
+  { name: "Categories", href: "/categories", icon: Tag, roles: ["admin", "superadmin", "manager"] },
+  { name: "Stock", href: "/stock", icon: Database, roles: ["admin", "superadmin", "manager", "storekeeper"] },
+  { name: "Purchases", href: "/purchases", icon: Truck, roles: ["admin", "superadmin", "manager", "storekeeper"] },
+  { name: "Suppliers", href: "/suppliers", icon: Users, roles: ["admin", "superadmin", "manager", "storekeeper"] },
+  { name: "Sales", href: "/sales", icon: FileText, roles: ["admin", "superadmin", "manager", "cashier"] },
+  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "superadmin", "manager"] },
+  { name: "Approvals", href: "/approvals", icon: CheckSquare, roles: ["admin", "superadmin"] },
+  { name: "Users", href: "/users", icon: Users, roles: ["admin", "superadmin"] },
+  { name: "Settings", href: "/settings", icon: Settings, roles: ["admin", "superadmin"] },
 ];
 
 export default function Sidebar({ children }: { children: React.ReactNode }) {

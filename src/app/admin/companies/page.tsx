@@ -35,13 +35,14 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: {
     name: string;
   };
   company: {
     id: string;
     name: string;
-  };
+  } | null;
   createdAt: string;
 }
 
@@ -73,10 +74,11 @@ export default function SuperadminDashboard() {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   
   // Form States
   const [companyForm, setCompanyForm] = useState({ name: "", email: "", phone: "", address: "" });
-  const [userForm, setUserForm] = useState({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "" });
+  const [userForm, setUserForm] = useState({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
   const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
@@ -134,21 +136,54 @@ export default function SuperadminDashboard() {
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/users", {
-        method: "POST",
+      const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
+      const method = editingUser ? "PUT" : "POST";
+      
+      const payload = {
+        name: userForm.name,
+        email: userForm.email,
+        roleId: userForm.roleId,
+        companyId: userForm.companyId || undefined,
+        phone: userForm.phone,
+        ...(editingUser ? {} : { password: userForm.password })
+      };
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(userForm)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         setIsUserModalOpen(false);
-        setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "" });
+        setEditingUser(null);
+        setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
         fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to save user");
       }
     } catch (err) {
-      console.error("Error creating user:", err);
+      console.error("Error saving user:", err);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to delete user");
+      }
+    } catch (err) {
+      console.error("Error deleting user:", err);
     }
   };
 
@@ -277,7 +312,16 @@ export default function SuperadminDashboard() {
                 />
               </div>
               <button 
-                onClick={() => activeTab === "companies" ? setIsCompanyModalOpen(true) : setIsUserModalOpen(true)}
+                onClick={() => {
+                  if (activeTab === "companies") {
+                    setCompanyForm({ name: "", email: "", phone: "", address: "" });
+                    setIsCompanyModalOpen(true);
+                  } else {
+                    setEditingUser(null);
+                    setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
+                    setIsUserModalOpen(true);
+                  }
+                }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 w-full sm:w-auto"
               >
                 {activeTab === "companies" ? <Building2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -453,6 +497,7 @@ export default function SuperadminDashboard() {
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">User</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Phone</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Company</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Role</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Joined</th>
@@ -472,6 +517,9 @@ export default function SuperadminDashboard() {
                               <p className="text-xs text-slate-500">{user.email}</p>
                             </div>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600 font-medium">
+                          {user.phone || "N/A"}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-slate-600">
@@ -494,12 +542,35 @@ export default function SuperadminDashboard() {
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button 
+                              onClick={() => {
+                                setEditingUser(user);
+                                setUserForm({
+                                  name: user.name,
+                                  email: user.email,
+                                  password: "",
+                                  roleId: user.role?.name || "",
+                                  companyId: user.company?.id || "",
+                                  phone: user.phone || ""
+                                });
+                                setIsUserModalOpen(true);
+                              }}
+                              className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+                              title="Edit User"
+                            >
+                              <Edit3 className="w-4.5 h-4.5" />
+                            </button>
+                            <button 
                               onClick={() => { setSelectedUser(user); setIsPasswordModalOpen(true); }}
                               className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+                              title="Reset Password"
                             >
                               <Key className="w-4 h-4" />
                             </button>
-                            <button className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all">
+                            <button 
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
+                              title="Delete User"
+                            >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -665,26 +736,34 @@ export default function SuperadminDashboard() {
 
       {isUserModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsUserModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsUserModalOpen(false); setEditingUser(null); }}></div>
           <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="p-6 sm:p-10">
               <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                <UserPlus className="w-6 h-6 text-indigo-600" /> New User
+                <UserPlus className="w-6 h-6 text-indigo-600" /> {editingUser ? "Edit User" : "New User"}
               </h2>
-              <form onSubmit={handleCreateUser} className="space-y-4">
+              <form onSubmit={handleSaveUser} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Full Name</label>
                   <input required className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value})} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</label>
-                  <input required type="email" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</label>
+                    <input required type="email" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Phone Number</label>
+                    <input required type="tel" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" placeholder="e.g. 0244123456" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value})} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
-                  <input required type="password" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} />
-                  <p className="text-[10px] text-slate-400 ml-1 italic">Default: zxcv123$$</p>
-                </div>
+                {!editingUser && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
+                    <input required type="password" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} />
+                    <p className="text-[10px] text-slate-400 ml-1 italic">Default: zxcv123$$</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Company</label>
@@ -711,8 +790,8 @@ export default function SuperadminDashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">Create</button>
+                  <button type="button" onClick={() => { setIsUserModalOpen(false); setEditingUser(null); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
+                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">{editingUser ? "Update" : "Create"}</button>
                 </div>
               </form>
             </div>

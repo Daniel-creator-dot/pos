@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Package, ArrowLeft, Mail, Phone, KeyRound, CheckCircle2, Lock, Sparkles } from "lucide-react";
+import { Package, ArrowLeft, Mail, Phone, KeyRound, CheckCircle2, Lock } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -51,9 +51,9 @@ export default function ForgotPasswordPage() {
         throw new Error(data.error || "Failed to send verification code. Please try again.");
       }
 
-      setSuccessMsg(data.message || "OTP code has been successfully dispatched!");
+      setSuccessMsg(data.message || "OTP code has been sent to your phone!");
       setStep("verify");
-      setCountdown(60); // Enable 60-second resend limit
+      setCountdown(60);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred. Please try again.");
     } finally {
@@ -123,7 +123,7 @@ export default function ForgotPasswordPage() {
         throw new Error(data.error || "Failed to resend verification code.");
       }
 
-      setSuccessMsg("A new verification code has been dispatched!");
+      setSuccessMsg("A new verification code has been sent!");
       setCountdown(60);
     } catch (err: any) {
       setError(err.message || "Failed to resend code.");
@@ -133,120 +133,112 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-emerald-950 p-4 transition-all duration-500">
-      <div className="max-w-md w-full mx-auto transform transition-all duration-300">
-        
-        {/* Card wrapper with premium subtle emerald glow */}
-        <div className="relative group overflow-hidden bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl p-8 before:absolute before:inset-0 before:bg-gradient-to-tr before:from-emerald-500/10 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-700">
-          
-          {/* Logo Section */}
-          <div className="text-center mb-6 relative">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="max-w-md w-full mx-4">
+        <div className="card shadow-lg">
+          {/* Header */}
+          <div className="card-header text-center">
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transform group-hover:scale-105 transition-transform duration-300">
-                <Package className="w-9 h-9 text-slate-950" />
+              <div className="w-16 h-16 bg-primary-600 rounded-lg flex items-center justify-center">
+                <Package className="w-10 h-10 text-white" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-              SwiftPOS Security <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-            </h1>
-            <p className="text-slate-400 text-sm mt-1.5">
-              {step === "request" && "Password Recovery Protocol"}
-              {step === "verify" && "OTP Authentication"}
-              {step === "success" && "Success Confirmed"}
+            <h1 className="text-2xl font-bold text-gray-900">SwiftPOS</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {step === "request" && "Reset your password"}
+              {step === "verify" && "Enter verification code"}
+              {step === "success" && "Password reset successful"}
             </p>
           </div>
 
-          {error && (
-            <div className="mb-5 p-4.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-sm leading-relaxed flex gap-2 animate-shake animate-duration-300">
-              <span className="font-semibold">⚠️ Alert:</span>
-              <span>{error}</span>
-            </div>
-          )}
+          <div className="card-content">
+            {/* Error */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+                {error}
+              </div>
+            )}
 
-          {/* Form Step 1: Identification & SMS Details */}
-          {step === "request" && (
-            <form onSubmit={handleRequestOtp} className="space-y-5 relative">
-              <div className="space-y-4">
+            {/* Step 1: Request OTP */}
+            {step === "request" && (
+              <form onSubmit={handleRequestOtp} className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Registered Email Address
+                  <label htmlFor="email" className="label block mb-2">
+                    Email Address
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <Mail className="w-4.5 h-4.5" />
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <Mail className="w-4 h-4" />
                     </span>
                     <input
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm transition-all shadow-inner"
-                      placeholder="e.g. jeremiah@company.com"
+                      className="input pl-10"
+                      placeholder="Enter your email"
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Mobile Money / SMS Phone Number
+                  <label htmlFor="phone" className="label block mb-2">
+                    Phone Number (for SMS code)
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <Phone className="w-4.5 h-4.5" />
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <Phone className="w-4 h-4" />
                     </span>
                     <input
                       id="phone"
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm transition-all shadow-inner"
+                      className="input pl-10"
                       placeholder="e.g. 0244123456 or +233244123456"
                       required
                     />
                   </div>
-                  <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">
-                    SMS code will be instantly dispatched using the high-performance Intek SMS engine.
+                  <p className="text-gray-400 text-xs mt-1.5">
+                    A 6-digit verification code will be sent to this number via SMS.
                   </p>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 mt-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "Requesting OTP Code..." : "Transmit Security OTP"}
-              </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary w-full h-11 text-base font-medium"
+                >
+                  {loading ? "Sending Code..." : "Send Verification Code"}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="w-full bg-transparent hover:bg-slate-800/30 text-slate-400 hover:text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back to Account Login
-              </button>
-            </form>
-          )}
+                <button
+                  type="button"
+                  onClick={() => router.push("/login")}
+                  className="w-full text-center text-sm text-gray-500 hover:text-gray-700 py-2 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Sign In
+                </button>
+              </form>
+            )}
 
-          {/* Form Step 2: Verification and Reset Password */}
-          {step === "verify" && (
-            <form onSubmit={handleResetPassword} className="space-y-5">
-              {successMsg && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs leading-relaxed flex gap-2">
-                  <span>✨</span>
-                  <span>{successMsg}</span>
-                </div>
-              )}
+            {/* Step 2: Verify OTP & Reset Password */}
+            {step === "verify" && (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                {successMsg && (
+                  <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
+                    ✅ {successMsg}
+                  </div>
+                )}
 
-              <div className="space-y-4">
                 <div>
-                  <label htmlFor="otpCode" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Enter 6-Digit SMS Verification Code
+                  <label htmlFor="otpCode" className="label block mb-2">
+                    6-Digit Verification Code
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <KeyRound className="w-4.5 h-4.5" />
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <KeyRound className="w-4 h-4" />
                     </span>
                     <input
                       id="otpCode"
@@ -254,27 +246,27 @@ export default function ForgotPasswordPage() {
                       maxLength={6}
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white text-center font-mono tracking-widest text-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder:font-sans placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-600"
-                      placeholder="XXXXXX"
+                      className="input pl-10 text-center font-mono tracking-widest text-lg"
+                      placeholder="000000"
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="newPassword" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Establish New Password
+                  <label htmlFor="newPassword" className="label block mb-2">
+                    New Password
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <Lock className="w-4.5 h-4.5" />
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <Lock className="w-4 h-4" />
                     </span>
                     <input
                       id="newPassword"
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm transition-all"
+                      className="input pl-10"
                       placeholder="At least 6 characters"
                       required
                     />
@@ -282,88 +274,87 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Confirm Password Choice
+                  <label htmlFor="confirmPassword" className="label block mb-2">
+                    Confirm New Password
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <Lock className="w-4.5 h-4.5" />
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <Lock className="w-4 h-4" />
                     </span>
                     <input
                       id="confirmPassword"
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm transition-all"
+                      className="input pl-10"
                       placeholder="Repeat new password"
                       required
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-between items-center text-xs mt-2 px-1">
-                <span className="text-slate-500">Didn't receive SMS?</span>
+                <div className="flex justify-between items-center text-xs px-1">
+                  <span className="text-gray-500">Didn&apos;t receive SMS?</span>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={countdown > 0 || loading}
+                    className={`font-semibold transition-colors ${
+                      countdown > 0
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-primary-600 hover:text-primary-700 cursor-pointer"
+                    }`}
+                  >
+                    {countdown > 0 ? `Resend in ${countdown}s` : "Resend Code"}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary w-full h-11 text-base font-medium"
+                >
+                  {loading ? "Resetting Password..." : "Reset Password"}
+                </button>
+
                 <button
                   type="button"
-                  onClick={handleResendOtp}
-                  disabled={countdown > 0 || loading}
-                  className={`font-semibold cursor-pointer transition-colors ${
-                    countdown > 0
-                      ? "text-slate-500 cursor-not-allowed"
-                      : "text-emerald-400 hover:text-emerald-300"
-                  }`}
+                  onClick={() => {
+                    setError("");
+                    setStep("request");
+                  }}
+                  className="w-full text-center text-sm text-gray-500 hover:text-gray-700 py-2 flex items-center justify-center gap-1.5 transition-colors"
                 >
-                  {countdown > 0 ? `Resend Available in ${countdown}s` : "Resend SMS Now"}
+                  <ArrowLeft className="w-4 h-4" /> Change Email
+                </button>
+              </form>
+            )}
+
+            {/* Step 3: Success */}
+            {step === "success" && (
+              <div className="text-center space-y-5 py-4">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="w-9 h-9 text-green-600" />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <h2 className="text-lg font-bold text-gray-900">Password Reset Successful</h2>
+                  <p className="text-gray-500 text-sm">
+                    Your password has been updated. You can now sign in with your new password.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => router.push("/login")}
+                  className="btn btn-primary w-full h-11 text-base font-medium"
+                >
+                  Back to Sign In
                 </button>
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 mt-5 disabled:opacity-50"
-              >
-                {loading ? "Re-Authorizing Password..." : "Execute Reset Sequence"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setError("");
-                  setStep("request");
-                }}
-                className="w-full bg-transparent hover:bg-slate-800/30 text-slate-400 hover:text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" /> Reset Email Address
-              </button>
-            </form>
-          )}
-
-          {/* Form Step 3: Success Confirmation */}
-          {step === "success" && (
-            <div className="text-center space-y-6 py-4 animate-fade-in animate-duration-500">
-              <div className="flex justify-center">
-                <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/5">
-                  <CheckCircle2 className="w-11 h-11 text-emerald-400 animate-bounce" />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-white">Credentials Restored</h2>
-                <p className="text-slate-400 text-sm leading-relaxed px-4">
-                  Your secure POS security key has been updated successfully inside the Supabase cluster.
-                </p>
-              </div>
-
-              <button
-                onClick={() => router.push("/login")}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all text-sm"
-              >
-                Launch Account Sign In
-              </button>
-            </div>
-          )}
-
+            )}
+          </div>
         </div>
       </div>
     </div>
