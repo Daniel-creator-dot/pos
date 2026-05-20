@@ -12,6 +12,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   roleId: string;
   role: { name: string; description: string | null } | null;
   createdAt: string;
@@ -36,6 +37,7 @@ export default function UsersPage() {
     name: "",
     email: "",
     password: "",
+    phone: "",
     roleId: "",
   });
 
@@ -143,6 +145,7 @@ export default function UsersPage() {
       name: user.name,
       email: user.email,
       password: "",
+      phone: user.phone || "",
       roleId: user.roleId,
     });
     setShowModal(true);
@@ -150,7 +153,7 @@ export default function UsersPage() {
 
   const openCreateModal = () => {
     setEditingUser(null);
-    setFormData({ name: "", email: "", password: "", roleId: roles[0]?.id || "" });
+    setFormData({ name: "", email: "", password: "", phone: "", roleId: roles[0]?.id || "" });
     setShowModal(true);
   };
 
@@ -215,6 +218,9 @@ export default function UsersPage() {
                         Email
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Phone
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Role
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -229,6 +235,7 @@ export default function UsersPage() {
                           {user.name}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{user.phone || "N/A"}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {user.role?.name || "N/A"}
                         </td>
@@ -282,6 +289,17 @@ export default function UsersPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="label block mb-1">Phone Number * (Mandatory for SMS OTP)</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="input"
+                placeholder="e.g. 0244123456 or +233244123456"
                 required
               />
             </div>

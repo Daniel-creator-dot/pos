@@ -21,7 +21,14 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, email, password, roleId, storeId } = body;
+    const { name, email, password, roleId, storeId, phone } = body;
+
+    if (!phone || phone.trim() === "") {
+      return NextResponse.json(
+        { error: "Phone number is required for security OTP delivery" },
+        { status: 400 }
+      );
+    }
 
     // Check if email is taken by another user
     const existingUser = await prisma.user.findUnique({
@@ -41,11 +48,13 @@ export async function PUT(
       passwordHash?: string;
       roleId?: string;
       storeId?: string | null;
+      phone?: string;
     } = {
       name,
       email,
       roleId,
       storeId,
+      phone,
     };
 
     // Update password if provided

@@ -64,7 +64,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, email, password, roleId, storeId, companyId } = body;
+    const { name, email, password, roleId, storeId, companyId, phone } = body;
+
+    if (!phone || phone.trim() === "") {
+      return NextResponse.json(
+        { error: "Phone number is required for security OTP delivery" },
+        { status: 400 }
+      );
+    }
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
@@ -100,6 +107,7 @@ export async function POST(request: Request) {
         roleId: finalRoleId,
         storeId: storeId || session.user.storeId,
         companyId: companyId || session.user.companyId,
+        phone,
       },
       include: {
         role: {

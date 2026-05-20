@@ -24,12 +24,12 @@ export async function POST(request: Request) {
     }
 
     // 2. Resolve recipient phone number
-    // Priority: 1. Input phone body parameter, 2. Associated store phone number, 3. Fallback placeholder
-    let recipientPhone = phone || user.store?.phone;
+    // Priority: 1. User's personal phone number, 2. Input phone body parameter, 3. Associated store phone number
+    let recipientPhone = user.phone || phone || user.store?.phone;
 
     if (!recipientPhone) {
       return NextResponse.json({ 
-        error: "No phone number associated with your account/store. Please provide your phone number in the form." 
+        error: "No phone number associated with your account. Please contact an administrator." 
       }, { status: 400 });
     }
 
