@@ -21,7 +21,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, email, password, roleId, storeId, phone } = body;
+    const { name, email, password, roleId, storeId, companyId, phone } = body;
 
     if (!phone || phone.trim() === "") {
       return NextResponse.json(
@@ -42,18 +42,31 @@ export async function PUT(
       );
     }
 
+    // Resolve roleId if it's a role name
+    let finalRoleId = roleId;
+    if (["admin", "manager", "cashier", "superadmin", "storekeeper"].includes(roleId)) {
+      const role = await prisma.role.findFirst({
+        where: { name: roleId as any },
+      });
+      if (role) {
+        finalRoleId = role.id;
+      }
+    }
+
     const updateData: {
       name?: string;
       email?: string;
       passwordHash?: string;
       roleId?: string;
       storeId?: string | null;
+      companyId?: string | null;
       phone?: string;
     } = {
       name,
       email,
-      roleId,
+      roleId: finalRoleId,
       storeId,
+      companyId: companyId || null,
       phone,
     };
 
