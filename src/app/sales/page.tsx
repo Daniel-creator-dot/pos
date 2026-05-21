@@ -66,6 +66,7 @@ export default function SalesHistoryPage() {
   };
 
   const fetchSales = async () => {
+    setLoading(true);
     try {
       let url = "/api/sales";
       const params = new URLSearchParams();

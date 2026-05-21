@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -11,20 +11,53 @@ export async function GET() {
 
     const { prisma } = await import("@/lib/prisma");
 
+    const { searchParams } = new URL(request.url);
+    const start = searchParams.get("start");
+    const end = searchParams.get("end");
+
+    const isSuperAdmin = session.user.role.name === "superadmin";
+    const companyId = session.user.companyId;
+
+    const whereClause: any = {};
+    if (!isSuperAdmin) {
+      whereClause.companyId = companyId;
+    }
+
+    let dateFilter: any = null;
+    if (start || end) {
+      dateFilter = {};
+      if (start) {
+        dateFilter.gte = new Date(`${start}T00:00:00.000Z`);
+      }
+      if (end) {
+        dateFilter.lte = new Date(`${end}T23:59:59.999Z`);
+      }
+    }
+
     // Get total sales
     const totalSalesResult = await prisma.sale.aggregate({
+      where: {
+        ...whereClause,
+        ...(dateFilter ? { createdAt: dateFilter } : {}),
+      },
       _sum: { total: true },
       _count: { id: true },
     });
 
     // Get total products
     const totalProducts = await prisma.product.count({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(!isSuperAdmin ? { companyId } : {}),
+      },
     });
 
     // Get low stock items
     const products = await prisma.product.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(!isSuperAdmin ? { companyId } : {}),
+      },
       select: { stockQty: true, lowStockThreshold: true },
     });
     const lowStockItems = products.filter(
@@ -34,6 +67,12 @@ export async function GET() {
 
     // Get top products
     const saleItems = await prisma.saleItem.findMany({
+      where: {
+        sale: {
+          ...whereClause,
+          ...(dateFilter ? { createdAt: dateFilter } : {}),
+        },
+      },
       select: {
         productId: true,
         qty: true,
@@ -69,6 +108,12 @@ export async function GET() {
 
     // Get sales by category
     const saleItemsWithCategory = await prisma.saleItem.findMany({
+      where: {
+        sale: {
+          ...whereClause,
+          ...(dateFilter ? { createdAt: dateFilter } : {}),
+        },
+      },
       select: {
         productId: true,
         subtotal: true,

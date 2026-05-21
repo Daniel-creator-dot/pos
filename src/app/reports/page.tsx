@@ -20,6 +20,7 @@ export default function ReportsPage() {
   const { data: session } = useSession();
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [currency, setCurrency] = useState("USD");
 
@@ -41,6 +42,7 @@ export default function ReportsPage() {
   };
 
   const fetchReportData = async () => {
+    setIsGenerating(true);
     try {
       let url = "/api/reports";
       const params = new URLSearchParams();
@@ -57,6 +59,7 @@ export default function ReportsPage() {
       console.error("Failed to fetch report data:", error);
     } finally {
       setLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -114,7 +117,7 @@ export default function ReportsPage() {
           </div>
           <button
             onClick={exportToExcel}
-            disabled={!reportData}
+            disabled={!reportData || isGenerating}
             className="btn btn-primary flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
@@ -143,14 +146,25 @@ export default function ReportsPage() {
                   className="input"
                 />
               </div>
-              <button onClick={fetchReportData} className="btn btn-primary mt-6">
-                Generate Report
+              <button
+                onClick={fetchReportData}
+                disabled={isGenerating}
+                className="btn btn-primary mt-6 flex items-center justify-center gap-2 min-w-[140px]"
+              >
+                {isGenerating ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Generating...
+                  </>
+                ) : (
+                  "Generate Report"
+                )}
               </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 transition-opacity duration-300 ${isGenerating ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -192,7 +206,7 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-300 ${isGenerating ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <div className="card">
             <div className="card-header">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
