@@ -73,10 +73,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Filter out invalid items (like empty product IDs)
+    const validItems = items.filter((item: any) => item.productId && item.productId.trim() !== "");
+    if (validItems.length === 0) {
+      return NextResponse.json(
+        { error: "At least one valid product must be selected" },
+        { status: 400 }
+      );
+    }
+
     // Calculate total
-    const total = items.reduce(
+    const total = validItems.reduce(
       (sum: number, item: { qty: number; unitCost: number }) =>
-        sum + item.qty * item.unitCost,
+        sum + (Number(item.qty) || 0) * (Number(item.unitCost) || 0),
       0
     );
 
@@ -90,10 +99,10 @@ export async function POST(request: Request) {
         notes,
         status: "PENDING",
         purchaseItems: {
-          create: items.map((item: { productId: string; qty: number; unitCost: number }) => ({
+          create: validItems.map((item: { productId: string; qty: number; unitCost: number }) => ({
             productId: item.productId,
-            qty: item.qty,
-            unitCost: item.unitCost,
+            qty: Number(item.qty) || 0,
+            unitCost: Number(item.unitCost) || 0,
           })),
         },
       },
@@ -114,10 +123,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(purchase, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Purchases API Error:", error);
     return NextResponse.json(
-      { error: "Failed to create purchase" },
+      { error: error?.message || "Failed to create purchase" },
       { status: 500 }
     );
   }

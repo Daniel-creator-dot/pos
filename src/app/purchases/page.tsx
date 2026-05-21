@@ -30,6 +30,7 @@ export default function PurchasesPage() {
   const { data: session } = useSession();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
@@ -50,9 +51,10 @@ export default function PurchasesPage() {
 
   const fetchData = async () => {
     try {
-      const [purchasesRes, suppliersRes] = await Promise.all([
+      const [purchasesRes, suppliersRes, productsRes] = await Promise.all([
         fetch("/api/purchases"),
         fetch("/api/suppliers"),
+        fetch("/api/products"),
       ]);
 
       if (purchasesRes.ok) {
@@ -64,11 +66,43 @@ export default function PurchasesPage() {
         const data = await suppliersRes.json();
         setSuppliers(data);
       }
+
+      if (productsRes.ok) {
+        const data = await productsRes.json();
+        setProducts(data.filter((p: any) => p.isActive));
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...formData.items];
+    newItems[index] = {
+      ...newItems[index],
+      [field]: field === "qty" ? parseInt(value) || 0 : field === "unitCost" ? parseFloat(value) || 0 : value,
+    };
+    if (field === "productId") {
+      const selectedProd = products.find((p) => p.id === value);
+      if (selectedProd) {
+        newItems[index].unitCost = selectedProd.cost || 0;
+      }
+    }
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const addItem = () => {
+    setFormData({
+      ...formData,
+      items: [...formData.items, { productId: products[0]?.id || "", qty: 1, unitCost: products[0]?.cost || 0 }],
+    });
+  };
+
+  const removeItem = (index: number) => {
+    const newItems = formData.items.filter((_, i) => i !== index);
+    setFormData({ ...formData, items: newItems });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,7 +152,7 @@ export default function PurchasesPage() {
   const openCreateModal = () => {
     setFormData({
       supplierId: suppliers[0]?.id || "",
-      items: [{ productId: "", qty: 1, unitCost: 0 }],
+      items: [{ productId: products[0]?.id || "", qty: 1, unitCost: products[0]?.cost || 0 }],
       notes: "",
     });
     setShowModal(true);
@@ -233,8 +267,8 @@ export default function PurchasesPage() {
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 my-8">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">New Purchase</h2>
@@ -262,6 +296,89 @@ export default function PurchasesPage() {
                 </div>
 
                 <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="label font-semibold text-gray-700">Purchase Items *</label>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="text-primary-600 hover:text-primary-800 text-xs font-semibold flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Product
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {formData.items.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-end border border-gray-100 p-2 rounded-lg bg-gray-50/50">
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="text-[10px] text-gray-400 block mb-0.5">Product</label>
+                          <select
+                            value={item.productId}
+                            onChange={(e) => handleItemChange(index, "productId", e.target.value)}
+                            className="input text-xs py-1"
+                            required
+                          >
+                            <option value="">Select product</option>
+                            {products.map((prod) => (
+                              <option key={prod.id} value={prod.id}>
+                                {prod.name} (Stock: {prod.stockQty})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="w-20">
+                          <label className="text-[10px] text-gray-400 block mb-0.5">Qty</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty}
+                            onChange={(e) => handleItemChange(index, "qty", e.target.value)}
+                            className="input text-xs py-1"
+                            required
+                          />
+                        </div>
+
+                        <div className="w-24">
+                          <label className="text-[10px] text-gray-400 block mb-0.5">Unit Cost</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitCost}
+                            onChange={(e) => handleItemChange(index, "unitCost", e.target.value)}
+                            className="input text-xs py-1"
+                            required
+                          />
+                        </div>
+
+                        <div className="w-20 text-right pb-2 text-xs font-medium text-gray-500">
+                          <span className="text-[10px] text-gray-400 block mb-0.5">Subtotal</span>
+                          ${(item.qty * item.unitCost).toFixed(2)}
+                        </div>
+
+                        {formData.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-red-500 hover:text-red-700 p-1 mb-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between border border-gray-200">
+                  <span className="text-sm font-semibold text-gray-600">Total Purchase Cost:</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    ${formData.items.reduce((sum, item) => sum + (item.qty * item.unitCost), 0).toFixed(2)}
+                  </span>
+                </div>
+
+                <div>
                   <label className="label block mb-1">Notes</label>
                   <textarea
                     value={formData.notes}
@@ -286,8 +403,8 @@ export default function PurchasesPage() {
       )}
 
       {selectedPurchase && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 my-8">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Purchase Details</h2>
@@ -297,30 +414,65 @@ export default function PurchasesPage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-500">Supplier</p>
-                  <p className="font-medium">{selectedPurchase.supplier.name}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Supplier</p>
+                    <p className="font-medium">{selectedPurchase.supplier.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Date</p>
+                    <p className="font-medium">{format(new Date(selectedPurchase.createdAt), "MMM d, yyyy h:mm a")}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                      selectedPurchase.status === "COMPLETED"
+                        ? "bg-green-100 text-green-700"
+                        : selectedPurchase.status === "PENDING"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}>
+                      {selectedPurchase.status}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="font-bold text-lg text-gray-900">${selectedPurchase.total.toFixed(2)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Date</p>
-                  <p className="font-medium">{format(new Date(selectedPurchase.createdAt), "MMM d, yyyy h:mm a")}</p>
+
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-sm text-gray-500 mb-2 font-medium">Purchase Items</p>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">Product</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">Qty</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">Unit Cost</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {selectedPurchase.purchaseItems.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-3 py-2 text-gray-900">{item.product?.name || "Unknown Product"}</td>
+                            <td className="px-3 py-2 text-gray-900 text-right">{item.qty}</td>
+                            <td className="px-3 py-2 text-gray-900 text-right">${item.unitCost.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-gray-900 text-right font-medium">${(item.qty * item.unitCost).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total</p>
-                  <p className="font-medium text-lg">${selectedPurchase.total.toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Status</p>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    selectedPurchase.status === "COMPLETED"
-                      ? "bg-green-100 text-green-700"
-                      : selectedPurchase.status === "PENDING"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700"
-                  }`}>
-                    {selectedPurchase.status}
-                  </span>
-                </div>
+
+                {selectedPurchase.notes && (
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-sm text-gray-500">Notes</p>
+                    <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-1">{selectedPurchase.notes}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
