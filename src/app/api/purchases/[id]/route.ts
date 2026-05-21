@@ -156,3 +156,79 @@ export async function PUT(
     );
   }
 }
+
+// DELETE /api/purchases/[id] - Delete a purchase
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Access check: only admins or superadmins can delete purchases
+    if (session.user.role.name !== "admin" && session.user.role.name !== "superadmin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const purchase = await prisma.purchase.findUnique({
+      where: { id: params.id },
+      include: {
+        purchaseItems: true,
+      },
+    });
+
+    if (!purchase) {
+      return NextResponse.json(
+        { error: "Purchase not found" },
+        { status: 404 }
+      );
+    }
+
+    // Scoping check: non-superadmins can only delete purchases belonging to their company
+    if (session.user.role.name !== "superadmin" && purchase.companyId !== session.user.companyId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Execute deletion inside a transaction
+    await prisma.$transaction(async (tx) => {
+      // Revert stock changes if the purchase was COMPLETED
+      if (purchase.status === "COMPLETED") {
+        for (const item of purchase.purchaseItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stockQty: {
+                decrement: item.qty,
+              },
+            },
+          });
+        }
+
+        // Delete associated stock movements
+        await tx.stockMovement.deleteMany({
+          where: {
+            reference: purchase.id,
+            productId: { in: purchase.purchaseItems.map(item => item.productId) },
+          },
+        });
+      }
+
+      // Delete the purchase (cascades to PurchaseItem)
+      await tx.purchase.delete({
+        where: { id: params.id },
+      });
+    });
+
+    return NextResponse.json({ message: "Purchase deleted successfully" });
+  } catch (error: any) {
+    console.error("Purchase DELETE Error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to delete purchase" },
+      { status: 500 }
+    );
+  }
+}
+

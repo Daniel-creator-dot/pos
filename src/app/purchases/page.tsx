@@ -2,9 +2,10 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Truck, Plus, Eye, Package, X } from "lucide-react";
+import { Truck, Plus, Eye, Package, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { formatCurrency } from "@/lib/currency";
 
 interface Purchase {
   id: string;
@@ -39,15 +40,31 @@ export default function PurchasesPage() {
     items: [{ productId: "", qty: 1, unitCost: 0 }],
     notes: "",
   });
+  const [currency, setCurrency] = useState("USD");
 
   const isAdmin = session?.user?.role?.name === "admin";
   const isManager = session?.user?.role?.name === "manager";
   const isStorekeeper = session?.user?.role?.name === "storekeeper";
-  const canCreate = isAdmin || isManager || isStorekeeper;
+  const isSuperAdmin = session?.user?.role?.name === "superadmin";
+  const canCreate = isAdmin || isManager || isStorekeeper || isSuperAdmin;
+  const canDelete = isAdmin || isSuperAdmin;
 
   useEffect(() => {
+    fetchSettings();
     fetchData();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch("/api/settings");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrency(data.currency || "USD");
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -149,6 +166,27 @@ export default function PurchasesPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this purchase? This will revert any stock changes if the purchase was COMPLETED.")) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/purchases/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        fetchData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to delete purchase");
+      }
+    } catch (error) {
+      console.error("Error deleting purchase:", error);
+      alert("Failed to delete purchase");
+    }
+  };
+
   const openCreateModal = () => {
     setFormData({
       supplierId: suppliers[0]?.id || "",
@@ -218,7 +256,7 @@ export default function PurchasesPage() {
                         <td className="px-4 py-3 text-sm text-gray-900">{purchase.supplier.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{purchase.purchaseItems.length} items</td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                          ${purchase.total.toFixed(2)}
+                          {formatCurrency(purchase.total, currency)}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span
@@ -249,6 +287,15 @@ export default function PurchasesPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => handleDelete(purchase.id)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Delete purchase"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -354,7 +401,7 @@ export default function PurchasesPage() {
 
                         <div className="w-20 text-right pb-2 text-xs font-medium text-gray-500">
                           <span className="text-[10px] text-gray-400 block mb-0.5">Subtotal</span>
-                          ${(item.qty * item.unitCost).toFixed(2)}
+                          {formatCurrency(item.qty * item.unitCost, currency)}
                         </div>
 
                         {formData.items.length > 1 && (
@@ -374,7 +421,7 @@ export default function PurchasesPage() {
                 <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between border border-gray-200">
                   <span className="text-sm font-semibold text-gray-600">Total Purchase Cost:</span>
                   <span className="text-lg font-bold text-gray-900">
-                    ${formData.items.reduce((sum, item) => sum + (item.qty * item.unitCost), 0).toFixed(2)}
+                    {formatCurrency(formData.items.reduce((sum, item) => sum + (item.qty * item.unitCost), 0), currency)}
                   </span>
                 </div>
 
@@ -437,7 +484,7 @@ export default function PurchasesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Total</p>
-                    <p className="font-bold text-lg text-gray-900">${selectedPurchase.total.toFixed(2)}</p>
+                    <p className="font-bold text-lg text-gray-900">{formatCurrency(selectedPurchase.total, currency)}</p>
                   </div>
                 </div>
 
@@ -458,8 +505,8 @@ export default function PurchasesPage() {
                           <tr key={index}>
                             <td className="px-3 py-2 text-gray-900">{item.product?.name || "Unknown Product"}</td>
                             <td className="px-3 py-2 text-gray-900 text-right">{item.qty}</td>
-                            <td className="px-3 py-2 text-gray-900 text-right">${item.unitCost.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-gray-900 text-right font-medium">${(item.qty * item.unitCost).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-gray-900 text-right">{formatCurrency(item.unitCost, currency)}</td>
+                            <td className="px-3 py-2 text-gray-900 text-right font-medium">{formatCurrency(item.qty * item.unitCost, currency)}</td>
                           </tr>
                         ))}
                       </tbody>
