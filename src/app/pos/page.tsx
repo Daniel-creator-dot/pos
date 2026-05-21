@@ -61,6 +61,7 @@ export default function POSPage() {
   const [momoPhoneInput, setMomoPhoneInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [currency, setCurrency] = useState("USD");
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -676,23 +677,44 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* Mobile Cart FAB */}
+      <button
+        onClick={() => setIsCartOpen(true)}
+        className="lg:hidden fixed bottom-6 right-6 z-30 w-16 h-16 bg-primary-600 text-white rounded-full shadow-lg shadow-primary-600/30 flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all"
+      >
+        <ShoppingCart className="w-6 h-6" />
+        {cart.length > 0 && (
+          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+            {cart.reduce((sum, item) => sum + item.quantity, 0)}
+          </span>
+        )}
+      </button>
+
+      {/* Mobile Cart Overlay */}
+      {isCartOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setIsCartOpen(false)}
+        />
+      )}
+
       {/* Main POS Layout */}
-      <div className="flex h-screen">
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] lg:h-screen">
         {/* Left: Products */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Search & Barcode */}
-          <div className="p-4 bg-white border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-3 sm:p-4 bg-white border-b border-gray-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 sm:mb-4">
                <div className="flex items-center gap-2">
                  <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse'}`}></div>
                  <span className={`text-xs font-bold uppercase tracking-wider ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
-                   {isOnline ? 'System Online' : 'System Offline (Local Mode)'}
+                   {isOnline ? 'Online' : 'Offline'}
                  </span>
                </div>
                {/* Sync Status Badge */}
                <SyncStatus />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <form onSubmit={handleBarcodeSubmit} className="flex-1">
                 <div className="relative">
                   <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -721,7 +743,7 @@ export default function POSPage() {
           </div>
 
           {/* Products Grid */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-3 sm:p-4 pb-24 lg:pb-4">
             <div className="pos-grid">
               {filteredProducts.map((product) => (
                 <div
@@ -731,14 +753,14 @@ export default function POSPage() {
                     product.stockQty <= 0 ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
-                  <div className="font-medium text-gray-900 truncate">
+                  <div className="font-medium text-gray-900 truncate text-sm sm:text-base">
                     {product.name}
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-xs sm:text-sm text-gray-500 mt-1">
                     {product.category?.name}
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="font-bold text-primary-600">
+                    <span className="font-bold text-primary-600 text-sm sm:text-base">
                       {formatCurrency(product.price, currency)}
                     </span>
                     <span
@@ -757,8 +779,10 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Right: Cart */}
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        {/* Right: Cart — desktop sidebar, mobile slide-over */}
+        <div className={`fixed lg:static inset-y-0 right-0 z-50 lg:z-auto w-[85vw] sm:w-96 bg-white border-l border-gray-200 flex flex-col transform transition-transform duration-300 ease-in-out lg:transform-none ${
+          isCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+        }`}>
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-5 h-5 text-gray-600" />
@@ -766,6 +790,12 @@ export default function POSPage() {
               <span className="ml-auto bg-primary-100 text-primary-700 text-xs font-medium px-2 py-1 rounded-full">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)} items
               </span>
+              <button
+                onClick={() => setIsCartOpen(false)}
+                className="lg:hidden ml-2 p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -859,6 +889,7 @@ export default function POSPage() {
                 setPaymentAmountInput("");
                 setMomoPhoneInput("");
                 setIsPaymentModalOpen(true);
+                setIsCartOpen(false);
               }}
               disabled={cart.length === 0}
               className="btn btn-primary w-full h-12 text-lg font-medium"

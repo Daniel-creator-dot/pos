@@ -65,10 +65,16 @@ export async function PUT(
       name,
       email,
       roleId: finalRoleId,
-      storeId,
-      companyId: companyId || null,
       phone,
     };
+
+    // Only update storeId and companyId if explicitly provided in the request
+    if (storeId !== undefined) {
+      updateData.storeId = storeId;
+    }
+    if (companyId !== undefined) {
+      updateData.companyId = companyId || null;
+    }
 
     // Update password if provided
     if (password) {
