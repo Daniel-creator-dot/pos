@@ -476,7 +476,7 @@ export default function POSPage() {
                   }}
                   className="btn btn-primary flex-1"
                 >
-                  New Sale
+                  Close
                 </button>
               </div>
             </div>
