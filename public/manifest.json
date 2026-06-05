@@ -1,0 +1,18 @@
+{
+  "short_name": "SwiftPOS",
+  "name": "SwiftPOS Point of Sale",
+  "description": "Fully offline-capable point of sale terminal",
+  "start_url": "/pos",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/pos_terminal.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
