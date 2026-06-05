@@ -285,10 +285,10 @@ export default function SalesHistoryPage() {
             <h1 className="text-2xl font-bold text-gray-900">Sales History</h1>
             <p className="text-sm text-gray-500 mt-1">View and manage all sales transactions</p>
           </div>
-          <Link href="/pos" className="btn btn-primary flex items-center gap-2">
+          <a href="/pos" className="btn btn-primary flex items-center gap-2">
             <Package className="w-4 h-4" />
             New Sale
-          </Link>
+          </a>
         </div>
       </header>
 
