@@ -297,11 +297,11 @@ export default function POSPage() {
     const tempReceipt = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     try {
-      // Save to local queue first
-      await db.salesQueue.add({
+      // Save to local queue first with 'syncing' status to prevent background sync from picking it up
+      const queueId = await db.salesQueue.add({
         receiptNumber: tempReceipt,
         data: saleData,
-        status: 'pending',
+        status: 'syncing',
         retryCount: 0
       });
 
@@ -317,8 +317,10 @@ export default function POSPage() {
           const result = await response.json();
           setLastSale(result);
           // Delete from local queue as it's successfully synced
-          await db.salesQueue.where("receiptNumber").equals(tempReceipt).delete();
+          await db.salesQueue.delete(queueId);
         } else {
+          // Update status back to 'pending' for background sync to retry
+          await db.salesQueue.update(queueId, { status: 'pending' });
           // Keep in queue, show local receipt
           setLastSale({
             ...saleData,
@@ -336,6 +338,8 @@ export default function POSPage() {
           });
         }
       } else {
+        // Offline: Update status to 'pending' for background sync
+        await db.salesQueue.update(queueId, { status: 'pending' });
         // Offline: Show local receipt
         setLastSale({
           ...saleData,
@@ -923,4 +927,4 @@ function SyncStatus() {
       )}
     </div>
   );
-}
+}
