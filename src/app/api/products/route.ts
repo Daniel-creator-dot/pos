@@ -23,6 +23,11 @@ export async function GET() {
             name: true,
           },
         },
+        company: {
+          select: {
+            name: true,
+          },
+        },
         createdBy: {
           select: {
             id: true,

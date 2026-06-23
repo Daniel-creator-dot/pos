@@ -51,7 +51,7 @@ export default function SuperadminDashboard() {
   const router = useRouter();
   
   // Dashboard State
-  const [activeTab, setActiveTab] = useState<"companies" | "users" | "stats" | "settings">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "users" | "products" | "stats" | "settings">("companies");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -90,6 +90,9 @@ export default function SuperadminDashboard() {
   const [editingStore, setEditingStore] = useState<any | null>(null);
   const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "" });
 
+  const [products, setProducts] = useState<any[]>([]);
+  const [companyFilter, setCompanyFilter] = useState("");
+
   useEffect(() => {
     if (status === "unauthenticated" || (session && session.user.role.name !== "superadmin")) {
       router.push("/login");
@@ -105,10 +108,28 @@ export default function SuperadminDashboard() {
         const res = await fetch("/api/companies");
         const data = await res.json();
         setCompanies(data);
+
+        // Also fetch all products for drill-down and inventory count
+        const prodRes = await fetch("/api/products");
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          setProducts(prodData);
+        }
       } else if (activeTab === "users") {
         const res = await fetch("/api/users");
         const data = await res.json();
         setUsers(data);
+      } else if (activeTab === "products") {
+        const res = await fetch("/api/products");
+        const data = await res.json();
+        setProducts(data);
+        
+        // Ensure companies are loaded for the filter dropdown
+        const compRes = await fetch("/api/companies");
+        if (compRes.ok) {
+          const compData = await compRes.json();
+          setCompanies(compData);
+        }
       } else if (activeTab === "stats") {
         const res = await fetch("/api/companies");
         const data = await res.json();
@@ -331,7 +352,13 @@ export default function SuperadminDashboard() {
     ? companies.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : activeTab === "users" 
       ? users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
-      : [];
+      : activeTab === "products"
+        ? products.filter(p => {
+            const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.barcode && p.barcode.toLowerCase().includes(searchQuery.toLowerCase()));
+            const matchesCompany = !companyFilter || p.companyId === companyFilter;
+            return matchesSearch && matchesCompany;
+          })
+        : [];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
@@ -371,6 +398,12 @@ export default function SuperadminDashboard() {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "users" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
           >
             <Users className="w-5 h-5" /> All Users
+          </button>
+          <button 
+            onClick={() => { setActiveTab("products"); setViewingCompany(null); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border ${activeTab === "products" ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'}`}
+          >
+            <ShoppingBag className="w-5 h-5" /> Store Items
           </button>
           <button 
             onClick={() => { setActiveTab("stats"); setViewingCompany(null); setIsSidebarOpen(false); }}
@@ -419,34 +452,36 @@ export default function SuperadminDashboard() {
             </div>
           </div>
 
-          {!viewingCompany && (activeTab === "companies" || activeTab === "users") && (
+          {!viewingCompany && (activeTab === "companies" || activeTab === "users" || activeTab === "products") && (
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder={`Search ${activeTab}...`} 
+                  placeholder={`Search ${activeTab === "products" ? "store items" : activeTab}...`} 
                   className="bg-slate-100 border-slate-200 rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none w-full text-slate-900"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <button 
-                onClick={() => {
-                  if (activeTab === "companies") {
-                    setCompanyForm({ name: "", email: "", phone: "", address: "" });
-                    setIsCompanyModalOpen(true);
-                  } else {
-                    setEditingUser(null);
-                    setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
-                    setIsUserModalOpen(true);
-                  }
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 w-full sm:w-auto"
-              >
-                {activeTab === "companies" ? <Building2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                Add {activeTab === "companies" ? "Company" : "User"}
-              </button>
+              {activeTab !== "products" && (
+                <button 
+                  onClick={() => {
+                    if (activeTab === "companies") {
+                      setCompanyForm({ name: "", email: "", phone: "", address: "" });
+                      setIsCompanyModalOpen(true);
+                    } else {
+                      setEditingUser(null);
+                      setUserForm({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
+                      setIsUserModalOpen(true);
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 w-full sm:w-auto"
+                >
+                  {activeTab === "companies" ? <Building2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                  Add {activeTab === "companies" ? "Company" : "User"}
+                </button>
+              )}
             </div>
           )}
         </header>
@@ -514,6 +549,47 @@ export default function SuperadminDashboard() {
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Products</p>
                       <p className="text-3xl font-black text-slate-900">{viewingCompany._count?.products || 0}</p>
                     </div>
+                  </div>
+
+                  {/* Company Products List */}
+                  <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                      <ShoppingBag className="w-5 h-5 text-indigo-600" /> Company Inventory ({products.filter(p => p.companyId === viewingCompany.id).length})
+                    </h3>
+                    {products.filter(p => p.companyId === viewingCompany.id).length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        No products configured for this company.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto max-h-96 overflow-y-auto pr-1">
+                        <table className="w-full text-left border-collapse text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-slate-500">
+                              <th className="pb-3 text-xs font-black uppercase tracking-widest">Name</th>
+                              <th className="pb-3 text-xs font-black uppercase tracking-widest">Barcode</th>
+                              <th className="pb-3 text-xs font-black uppercase tracking-widest">Category</th>
+                              <th className="pb-3 text-xs font-black uppercase tracking-widest">Selling Price</th>
+                              <th className="pb-3 text-xs font-black uppercase tracking-widest">Stock Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {products.filter(p => p.companyId === viewingCompany.id).map((prod) => (
+                              <tr key={prod.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                <td className="py-3 font-bold text-slate-950">{prod.name}</td>
+                                <td className="py-3 font-mono text-slate-650">{prod.barcode || "N/A"}</td>
+                                <td className="py-3 text-slate-600 font-medium">{prod.category?.name || "Uncategorized"}</td>
+                                <td className="py-3 text-indigo-600 font-bold">${prod.price.toFixed(2)}</td>
+                                <td className="py-3">
+                                  <span className={`font-bold ${prod.stockQty <= prod.lowStockThreshold ? "text-rose-600" : "text-slate-900"}`}>
+                                    {prod.stockQty} {prod.stockQty <= prod.lowStockThreshold && "⚠️"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -724,6 +800,92 @@ export default function SuperadminDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          ) : activeTab === "products" ? (
+            /* Products Table */
+            <div className="space-y-6">
+              {/* Filter controls */}
+              <div className="flex flex-col sm:flex-row gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-indigo-600" />
+                  <span className="font-bold text-slate-800">Filter by Company:</span>
+                </div>
+                <select 
+                  className="w-full sm:w-64 bg-slate-50 border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 text-sm"
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                >
+                  <option value="">All Companies</option>
+                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50">
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Product / SKU</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Barcode</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Category</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Company / Org</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Cost Price</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Selling Price</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Stock Qty</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredData.map((product: any) => (
+                        <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-bold text-slate-900">{product.name}</p>
+                              <p className="text-[10px] font-mono text-slate-400 mt-0.5">{product.id}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-mono text-slate-600">
+                            {product.barcode || "N/A"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600 font-medium">
+                            {product.category?.name || "Uncategorized"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-slate-950 font-bold text-sm">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                              {product.company?.name || "Platform"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600 font-bold">
+                            ${product.cost.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-indigo-600 font-bold">
+                            ${product.price.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`text-sm font-black ${
+                              product.stockQty <= product.lowStockThreshold 
+                                ? "text-rose-600" 
+                                : "text-slate-900"
+                            }`}>
+                              {product.stockQty} {product.stockQty <= product.lowStockThreshold && "⚠️"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              product.isActive 
+                                ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
+                                : "bg-slate-50 text-slate-600 border border-slate-100"
+                            }`}>
+                              {product.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           ) : activeTab === "stats" ? (
