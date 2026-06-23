@@ -141,3 +141,58 @@ export async function DELETE(
     );
   }
 }
+
+// PATCH /api/users/[id] - Partially update user status (deactivate/activate)
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admin or superadmin can toggle user status
+    if (session.user.role.name !== "admin" && session.user.role.name !== "superadmin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { isActive } = body;
+
+    // Prevent deactivating self
+    if (isActive === false && params.id === session.user.id) {
+      return NextResponse.json(
+        { error: "Cannot deactivate your own account" },
+        { status: 400 }
+      );
+    }
+
+    const updateData: { isActive?: boolean } = {};
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: params.id },
+      data: updateData,
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(user);
+  } catch (error) {
+    console.error("Users API Error:", error);
+    return NextResponse.json(
+      { error: "Failed to update user status" },
+      { status: 500 }
+    );
+  }
+}

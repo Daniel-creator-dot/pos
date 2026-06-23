@@ -11,7 +11,7 @@ import {
   MoreVertical, Trash2, Edit3, X, Menu,
   UserPlus, Check, AlertCircle, RefreshCw,
   TrendingUp, BarChart3, Activity, Shield,
-  ArrowLeft, ExternalLink
+  ArrowLeft, ExternalLink, UserX, UserCheck
 } from "lucide-react";
 
 interface Company {
@@ -36,6 +36,7 @@ interface User {
   name: string;
   email: string;
   phone: string | null;
+  isActive?: boolean;
   role: {
     name: string;
   };
@@ -325,6 +326,28 @@ export default function SuperadminDashboard() {
       }
     } catch (err) {
       console.error("Error deleting user:", err);
+    }
+  };
+
+  const handleToggleUserStatus = async (user: User) => {
+    const isDeactivating = user.isActive !== false;
+    const action = isDeactivating ? 'deactivate' : 'activate';
+    if (!confirm(`Are you sure you want to ${action} ${user.name}?`)) return;
+
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !isDeactivating })
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || `Failed to ${action} user`);
+      }
+    } catch (err) {
+      console.error(`Error toggling user status:`, err);
     }
   };
 
@@ -721,6 +744,7 @@ export default function SuperadminDashboard() {
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Phone</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Company</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Role</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Status</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Joined</th>
                       <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest text-right">Actions</th>
                     </tr>
@@ -757,6 +781,15 @@ export default function SuperadminDashboard() {
                             {user.role?.name || 'Unknown'}
                           </span>
                         </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            user.isActive !== false 
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                              : 'bg-red-50 text-red-600 border border-red-100'
+                          }`}>
+                            {user.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-sm text-slate-500">
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
@@ -780,6 +813,19 @@ export default function SuperadminDashboard() {
                             >
                               <Edit3 className="w-4.5 h-4.5" />
                             </button>
+                            {user.id !== session?.user?.id && (
+                              <button 
+                                onClick={() => handleToggleUserStatus(user)}
+                                className={`p-2 rounded-lg transition-all ${
+                                  user.isActive !== false 
+                                    ? 'hover:bg-red-50 text-slate-400 hover:text-red-650' 
+                                    : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-650'
+                                }`}
+                                title={user.isActive !== false ? "Deactivate User" : "Activate User"}
+                              >
+                                {user.isActive !== false ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                              </button>
+                            )}
                             <button 
                               onClick={() => { setSelectedUser(user); setIsPasswordModalOpen(true); }}
                               className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
