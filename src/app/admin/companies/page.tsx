@@ -80,6 +80,15 @@ export default function SuperadminDashboard() {
   const [companyForm, setCompanyForm] = useState({ name: "", email: "", phone: "", address: "" });
   const [userForm, setUserForm] = useState({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
   const [newPassword, setNewPassword] = useState("");
+  
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  
+  // Stores management states
+  const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [editingStore, setEditingStore] = useState<any | null>(null);
+  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "" });
 
   useEffect(() => {
     if (status === "unauthenticated" || (session && session.user.role.name !== "superadmin")) {
@@ -118,21 +127,132 @@ export default function SuperadminDashboard() {
     }
   };
 
-  const handleCreateCompany = async (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/companies", {
-        method: "POST",
+      const url = editingCompany ? `/api/companies/${editingCompany.id}` : "/api/companies";
+      const method = editingCompany ? "PUT" : "POST";
+      
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(companyForm)
       });
       if (res.ok) {
+        const updated = await res.json();
         setIsCompanyModalOpen(false);
         setCompanyForm({ name: "", email: "", phone: "", address: "" });
+        setEditingCompany(null);
+        
+        if (viewingCompany && viewingCompany.id === updated.id) {
+          setViewingCompany(updated);
+        }
+        
         fetchData();
       }
     } catch (err) {
-      console.error("Error creating company:", err);
+      console.error("Error saving company:", err);
+    }
+  };
+
+  const handleToggleCompanyStatus = async (company: Company) => {
+    const isActivating = company.status !== 'ACTIVE';
+    const action = isActivating ? 'activate' : 'deactivate';
+    if (!confirm(`Are you sure you want to ${action} ${company.name}?`)) return;
+    
+    try {
+      const res = await fetch(`/api/companies/${company.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: isActivating ? 'ACTIVE' : 'SUSPENDED' })
+      });
+      
+      if (res.ok) {
+        const updated = await res.json();
+        setViewingCompany(updated);
+        fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || `Failed to ${action} company`);
+      }
+    } catch (err) {
+      console.error(`Error toggling company status:`, err);
+    }
+  };
+
+  const fetchStores = async (companyId: string) => {
+    setLoadingStores(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/stores`);
+      if (res.ok) {
+        const data = await res.json();
+        setStores(data);
+      }
+    } catch (err) {
+      console.error("Error fetching stores:", err);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
+
+  const handleSaveStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewingCompany) return;
+    try {
+      const url = `/api/companies/${viewingCompany.id}/stores`;
+      const method = editingStore ? "PUT" : "POST";
+      const payload = editingStore 
+        ? { storeId: editingStore.id, ...storeForm }
+        : storeForm;
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setStoreForm({ name: "", address: "", phone: "" });
+        setEditingStore(null);
+        fetchStores(viewingCompany.id);
+        
+        const compRes = await fetch("/api/companies");
+        if (compRes.ok) {
+          const comps = await compRes.json();
+          setCompanies(comps);
+          const updatedViewing = comps.find((c: any) => c.id === viewingCompany.id);
+          if (updatedViewing) setViewingCompany(updatedViewing);
+        }
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to save store");
+      }
+    } catch (err) {
+      console.error("Error saving store:", err);
+    }
+  };
+
+  const handleDeleteStore = async (storeId: string) => {
+    if (!viewingCompany) return;
+    if (!confirm("Are you sure you want to delete this store?")) return;
+    try {
+      const res = await fetch(`/api/companies/${viewingCompany.id}/stores?storeId=${storeId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchStores(viewingCompany.id);
+        const compRes = await fetch("/api/companies");
+        if (compRes.ok) {
+          const comps = await compRes.json();
+          setCompanies(comps);
+          const updatedViewing = comps.find((c: any) => c.id === viewingCompany.id);
+          if (updatedViewing) setViewingCompany(updatedViewing);
+        }
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to delete store");
+      }
+    } catch (err) {
+      console.error("Error deleting store:", err);
     }
   };
 
@@ -402,14 +522,39 @@ export default function SuperadminDashboard() {
                   <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl">
                     <h3 className="text-lg font-bold mb-6">Quick Actions</h3>
                     <div className="space-y-3">
-                      <button className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group">
+                      <button 
+                        onClick={() => {
+                          setEditingCompany(viewingCompany);
+                          setCompanyForm({
+                            name: viewingCompany.name,
+                            email: viewingCompany.email || "",
+                            phone: viewingCompany.phone || "",
+                            address: viewingCompany.address || "",
+                          });
+                          setIsCompanyModalOpen(true);
+                        }}
+                        className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                      >
                         <Edit3 className="w-4 h-4 group-hover:scale-110 transition-transform" /> Edit Company
                       </button>
-                      <button className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group">
+                      <button 
+                        onClick={() => {
+                          fetchStores(viewingCompany.id);
+                          setIsStoresModalOpen(true);
+                        }}
+                        className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                      >
                         <Store className="w-4 h-4 group-hover:scale-110 transition-transform" /> Manage Stores
                       </button>
-                      <button className="w-full py-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2">
-                        <Trash2 className="w-4 h-4" /> Deactivate
+                      <button 
+                        onClick={() => handleToggleCompanyStatus(viewingCompany)}
+                        className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          viewingCompany.status === 'ACTIVE' 
+                            ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
+                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400'
+                        }`}
+                      >
+                        <Trash2 className="w-4 h-4" /> {viewingCompany.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                       </button>
                     </div>
                   </div>
@@ -699,13 +844,13 @@ export default function SuperadminDashboard() {
       {/* Modals */}
       {isCompanyModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCompanyModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm({ name: "", email: "", phone: "", address: "" }); }}></div>
           <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="p-6 sm:p-10">
               <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                <Building2 className="w-6 h-6 text-indigo-600" /> New Company
+                <Building2 className="w-6 h-6 text-indigo-600" /> {editingCompany ? "Edit Company" : "New Company"}
               </h2>
-              <form onSubmit={handleCreateCompany} className="space-y-4">
+              <form onSubmit={handleSaveCompany} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Company Name</label>
                   <input required className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={companyForm.name} onChange={(e) => setCompanyForm({...companyForm, name: e.target.value})} />
@@ -725,8 +870,8 @@ export default function SuperadminDashboard() {
                   <textarea rows={2} className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-slate-900" value={companyForm.address} onChange={(e) => setCompanyForm({...companyForm, address: e.target.value})} />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">Create</button>
+                  <button type="button" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm({ name: "", email: "", phone: "", address: "" }); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
+                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">{editingCompany ? "Update" : "Create"}</button>
                 </div>
               </form>
             </div>
@@ -814,6 +959,128 @@ export default function SuperadminDashboard() {
                   <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20">Reset</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isStoresModalOpen && viewingCompany && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsStoresModalOpen(false); setEditingStore(null); setStoreForm({ name: "", address: "", phone: "" }); }}></div>
+          <div className="relative bg-white border border-slate-200 w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="p-6 sm:p-10">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                  <Store className="w-6 h-6 text-indigo-600" /> Manage Stores - {viewingCompany.name}
+                </h2>
+                <button 
+                  onClick={() => { setIsStoresModalOpen(false); setEditingStore(null); setStoreForm({ name: "", address: "", phone: "" }); }}
+                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Store creation/editing inline form */}
+              <div className="bg-slate-50 border border-slate-150 p-6 rounded-3xl mb-8">
+                <h3 className="text-sm font-bold text-slate-800 mb-4">
+                  {editingStore ? "Edit Store" : "Add New Store"}
+                </h3>
+                <form onSubmit={handleSaveStore} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Store Name</label>
+                      <input 
+                        required 
+                        className="w-full bg-white border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 text-sm" 
+                        value={storeForm.name} 
+                        onChange={(e) => setStoreForm({...storeForm, name: e.target.value})} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Phone</label>
+                      <input 
+                        className="w-full bg-white border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 text-sm" 
+                        value={storeForm.phone} 
+                        onChange={(e) => setStoreForm({...storeForm, phone: e.target.value})} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Address</label>
+                      <input 
+                        className="w-full bg-white border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 text-sm" 
+                        value={storeForm.address} 
+                        onChange={(e) => setStoreForm({...storeForm, address: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    {editingStore && (
+                      <button 
+                        type="button" 
+                        onClick={() => { setEditingStore(null); setStoreForm({ name: "", address: "", phone: "" }); }} 
+                        className="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button 
+                      type="submit" 
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-500/10 transition-colors"
+                    >
+                      {editingStore ? "Update Store" : "Add Store"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Stores list */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Current Stores</h3>
+                {loadingStores ? (
+                  <div className="py-8 text-center text-slate-500 text-sm">Loading stores...</div>
+                ) : stores.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200">No stores configured.</div>
+                ) : (
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                    {stores.map((store) => (
+                      <div key={store.id} className="flex justify-between items-center p-4 bg-white border border-slate-200 rounded-2xl hover:border-slate-350 transition-colors">
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">{store.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {store.phone && `📞 ${store.phone}`} {store.address && `📍 ${store.address}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setEditingStore(store);
+                              setStoreForm({
+                                name: store.name,
+                                phone: store.phone || "",
+                                address: store.address || "",
+                              });
+                            }}
+                            className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+                            title="Edit Store"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteStore(store.id)}
+                            className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
+                            title="Delete Store"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
