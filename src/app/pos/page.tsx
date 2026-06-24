@@ -19,8 +19,6 @@ import {
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { formatCurrency } from "@/lib/currency";
-import { db } from "@/lib/db";
-import { useLiveQuery } from "dexie-react-hooks";
 
 interface Product {
   id: string;
@@ -77,25 +75,11 @@ export default function POSPage() {
     };
   }, []);
 
-  // Fetch settings and products with offline caching
+  // Fetch settings and products directly from server
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Load from local DB first for instant UI
-        const localSettings = await db.settings.get("currency");
-        if (localSettings) setCurrency(localSettings.value);
-
-        const localProducts = await db.products.toArray();
-        if (localProducts.length > 0) {
-          const formatted = localProducts.map(p => ({
-            ...p,
-            category: p.categoryName ? { name: p.categoryName } : null
-          }));
-          setProducts(formatted);
-          setFilteredProducts(formatted);
-        }
-
-        // Attempt to refresh from server
+        // Fetch from server
         const [settingsRes, productsRes] = await Promise.all([
           fetch("/api/settings").catch(() => null),
           fetch("/api/products").catch(() => null),
@@ -104,7 +88,6 @@ export default function POSPage() {
         if (settingsRes?.ok) {
           const data = await settingsRes.json();
           setCurrency(data.currency || "USD");
-          await db.settings.put({ key: "currency", value: data.currency || "USD" });
         }
 
         if (productsRes?.ok) {
@@ -113,19 +96,6 @@ export default function POSPage() {
           const activeProducts = data.filter((p: any) => !p.isPendingDelete);
           setProducts(activeProducts);
           setFilteredProducts(activeProducts);
-          
-          // Update local cache
-          await db.products.clear();
-          await db.products.bulkPut(activeProducts.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            barcode: p.barcode,
-            price: Number(p.price),
-            stockQty: Number(p.stockQty),
-            lowStockThreshold: Number(p.lowStockThreshold),
-            categoryName: p.category?.name || null,
-            updatedAt: Date.now()
-          })));
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -137,50 +107,7 @@ export default function POSPage() {
     fetchData();
   }, []);
 
-  // Background Sync Effect
-  useEffect(() => {
-    if (!isOnline) return;
-
-    const syncSales = async () => {
-      const pending = await db.salesQueue.where("status").equals("pending").toArray();
-      if (pending.length === 0) return;
-
-      console.log(`Syncing ${pending.length} pending sales...`);
-
-      for (const sale of pending) {
-        try {
-          await db.salesQueue.update(sale.id!, { status: 'syncing' });
-          
-          const response = await fetch("/api/sales", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(sale.data),
-          });
-
-          if (response.ok) {
-            await db.salesQueue.delete(sale.id!);
-            console.log(`Synced sale ${sale.receiptNumber}`);
-          } else {
-            const error = await response.json();
-            await db.salesQueue.update(sale.id!, { 
-              status: 'pending', 
-              lastError: error.error || 'Server error',
-              retryCount: sale.retryCount + 1 
-            });
-          }
-        } catch (error) {
-          await db.salesQueue.update(sale.id!, { 
-            status: 'pending', 
-            retryCount: sale.retryCount + 1 
-          });
-        }
-      }
-    };
-
-    const timer = setInterval(syncSales, 10000); // Try every 10 seconds
-    syncSales(); // Also try immediately when coming online
-    return () => clearInterval(timer);
-  }, [isOnline]);
+  // Offline background sync removed as we now use direct server communication
 
   // Focus barcode input on mount and after certain actions
   useEffect(() => {
@@ -278,6 +205,11 @@ export default function POSPage() {
       return;
     }
 
+    if (!isOnline) {
+      alert("Cannot complete transaction. You are offline. Please reconnect to the internet.");
+      return;
+    }
+
     setProcessing(true);
 
     const saleData = {
@@ -293,78 +225,28 @@ export default function POSPage() {
       createdAt: new Date().toISOString(),
     };
 
-    // Generate local temp receipt
-    const tempReceipt = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
     try {
-      // Save to local queue first with 'syncing' status to prevent background sync from picking it up
-      const queueId = await db.salesQueue.add({
-        receiptNumber: tempReceipt,
-        data: saleData,
-        status: 'syncing',
-        retryCount: 0
+      const response = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(saleData),
       });
 
-      // Attempt to sync immediately if online
-      if (isOnline) {
-        const response = await fetch("/api/sales", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saleData),
-        });
+      const result = await response.json().catch(() => ({ error: "Unknown response error" }));
 
-        if (response.ok) {
-          const result = await response.json();
-          setLastSale(result);
-          // Delete from local queue as it's successfully synced
-          await db.salesQueue.delete(queueId);
-        } else {
-          // Update status back to 'pending' for background sync to retry
-          await db.salesQueue.update(queueId, { status: 'pending' });
-          // Keep in queue, show local receipt
-          setLastSale({
-            ...saleData,
-            receiptNumber: tempReceipt,
-            saleItems: cart.map(item => ({
-              id: Math.random().toString(),
-              product: item.product,
-              qty: item.quantity,
-              subtotal: item.product.price * item.quantity
-            })),
-            subtotal,
-            discountAmount,
-            total,
-            createdAt: saleData.createdAt
-          });
-        }
+      if (response.ok) {
+        setLastSale(result);
+        setShowReceipt(true);
+        setIsPaymentModalOpen(false);
+        setCart([]);
+        setPayments([]);
+        setDiscount(0);
       } else {
-        // Offline: Update status to 'pending' for background sync
-        await db.salesQueue.update(queueId, { status: 'pending' });
-        // Offline: Show local receipt
-        setLastSale({
-          ...saleData,
-          receiptNumber: tempReceipt,
-          saleItems: cart.map(item => ({
-            id: Math.random().toString(),
-            product: item.product,
-            qty: item.quantity,
-            subtotal: item.product.price * item.quantity
-          })),
-          subtotal,
-          discountAmount,
-          total,
-          createdAt: saleData.createdAt
-        });
+        alert(`Failed to complete transaction: ${result.error || "Server error"}`);
       }
-
-      setShowReceipt(true);
-      setIsPaymentModalOpen(false);
-      setCart([]);
-      setPayments([]);
-      setDiscount(0);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sale error:", error);
-      alert("Failed to save sale. Please check device storage.");
+      alert(`Sale error: ${error.message || "Failed to complete transaction. Please check your internet connection."}`);
     } finally {
       setProcessing(false);
     }
@@ -715,8 +597,6 @@ export default function POSPage() {
                    {isOnline ? 'Online' : 'Offline'}
                  </span>
                </div>
-               {/* Sync Status Badge */}
-               <SyncStatus />
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <form onSubmit={handleBarcodeSubmit} className="flex-1">
@@ -909,22 +789,4 @@ export default function POSPage() {
   );
 }
 
-function SyncStatus() {
-  const pendingCount = useLiveQuery(() => db.salesQueue.where("status").equals("pending").count()) ?? 0;
-  const syncingCount = useLiveQuery(() => db.salesQueue.where("status").equals("syncing").count()) ?? 0;
-
-  if (pendingCount === 0 && syncingCount === 0) return null;
-
-  return (
-    <div className="flex items-center gap-3 bg-blue-50 px-4 py-1.5 rounded-full border border-blue-100 animate-in fade-in slide-in-from-top-2">
-      {syncingCount > 0 ? (
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Syncing Data...</span>
-        </div>
-      ) : (
-        <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">{pendingCount} Pending Sync</span>
-      )}
-    </div>
-  );
-}
+// SyncStatus component removed
