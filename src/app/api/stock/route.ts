@@ -12,6 +12,13 @@ export async function GET() {
     }
 
     const movements = await prisma.stockMovement.findMany({
+      where: session.user.role.name !== "superadmin"
+        ? {
+            product: {
+              companyId: session.user.companyId || "",
+            },
+          }
+        : {},
       take: 50,
       orderBy: {
         createdAt: "desc",
@@ -50,11 +57,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions - only admin, manager, or storekeeper can adjust stock
+    // Check permissions - only admin, manager, storekeeper, or superadmin can adjust stock
     if (
       session.user.role.name !== "admin" &&
       session.user.role.name !== "manager" &&
-      session.user.role.name !== "storekeeper"
+      session.user.role.name !== "storekeeper" &&
+      session.user.role.name !== "superadmin"
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -69,9 +77,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify product exists
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
+    // Verify product exists and belongs to the user's company (if not superadmin)
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        ...(session.user.role.name !== "superadmin"
+          ? { companyId: session.user.companyId || "" }
+          : {}),
+      },
     });
 
     if (!product) {
