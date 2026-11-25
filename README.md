@@ -64,10 +64,12 @@ A modern, full-stack Point of Sale (POS) application built with Next.js, Postgre
    npm run prisma:migrate
    ```
 
-5. **Seed the database**
+5. **Reset the database for a new company**
    ```bash
    npm run prisma:seed
    ```
+
+   This deletes existing companies, users, products, and sales, then leaves an empty database with roles and one platform superadmin. No sample shop is created. Set `SEED_SUPERADMIN_EMAIL` and `SEED_SUPERADMIN_PASSWORD` before seeding if you do not want the default login.
 
 6. **Start the development server**
    ```bash
@@ -82,10 +84,9 @@ A modern, full-stack Point of Sale (POS) application built with Next.js, Postgre
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@swiftpos.com | admin123 |
-| Manager | manager@swiftpos.com | manager123 |
-| Cashier | cashier@swiftpos.com | cashier123 |
-| Storekeeper | storekeeper@swiftpos.com | storekeeper123 |
+| Superadmin | superadmin@pos.com | ChangeMe123! |
+
+Change this password after the first login. Create the new company, store, and staff from the superadmin screen. There is no sample catalog.
 
 ## Project Structure
 
