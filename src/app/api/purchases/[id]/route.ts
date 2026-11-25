@@ -120,6 +120,20 @@ export async function PUT(
       // If status is updated to COMPLETED, increment stock levels and create stock movements
       if (status === "COMPLETED" && purchase.status === "PENDING") {
         for (const item of purchase.purchaseItems) {
+          const product = await tx.product.findFirst({
+            where: {
+              id: item.productId,
+              ...(session.user.role.name !== "superadmin"
+                ? { companyId: session.user.companyId ?? null }
+                : {}),
+            },
+            select: { id: true },
+          });
+
+          if (!product) {
+            throw new Error("Product not found");
+          }
+
           // Increment product stock
           await tx.product.update({
             where: { id: item.productId },
@@ -197,6 +211,20 @@ export async function DELETE(
       // Revert stock changes if the purchase was COMPLETED
       if (purchase.status === "COMPLETED") {
         for (const item of purchase.purchaseItems) {
+          const product = await tx.product.findFirst({
+            where: {
+              id: item.productId,
+              ...(session.user.role.name !== "superadmin"
+                ? { companyId: session.user.companyId ?? null }
+                : {}),
+            },
+            select: { id: true },
+          });
+
+          if (!product) {
+            throw new Error("Product not found");
+          }
+
           await tx.product.update({
             where: { id: item.productId },
             data: {

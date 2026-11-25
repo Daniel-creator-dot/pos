@@ -54,10 +54,16 @@ export async function POST(request: Request) {
       // Calculate total
       const total = subtotal - discountAmount;
 
-      // Verify stock availability for all items
+      // Verify stock availability for all items. Non-superadmins can only
+      // sell products that belong to their company, matching stock adjustments.
       for (const item of items) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
+        const product = await tx.product.findFirst({
+          where: {
+            id: item.productId,
+            ...(session.user.role.name !== "superadmin"
+              ? { companyId: session.user.companyId ?? null }
+              : {}),
+          },
         });
 
         if (!product) {

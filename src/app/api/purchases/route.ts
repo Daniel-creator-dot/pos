@@ -82,6 +82,29 @@ export async function POST(request: Request) {
       );
     }
 
+    const productIds: string[] = [];
+    for (const item of validItems) {
+      if (!productIds.includes(item.productId)) {
+        productIds.push(item.productId);
+      }
+    }
+    const ownedProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        ...(session.user.role.name !== "superadmin"
+          ? { companyId: session.user.companyId ?? null }
+          : {}),
+      },
+      select: { id: true },
+    });
+
+    if (ownedProducts.length !== productIds.length) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
+    }
+
     // Calculate total
     const total = validItems.reduce(
       (sum: number, item: { qty: number; unitCost: number }) =>

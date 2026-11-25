@@ -29,6 +29,11 @@ export async function GET(
       );
     }
 
+    // Access check: non-superadmins can only access products within their company
+    if (session.user.role.name !== "superadmin" && product.companyId !== (session.user.companyId ?? null)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return NextResponse.json(product);
   } catch (error: any) {
     console.error("Product GET Error:", error);
@@ -54,11 +59,27 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const { prisma } = await import("@/lib/prisma");
+
+    const existing = await prisma.product.findUnique({
+      where: { id: params.id },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    // Admins and managers can only update products within their company
+    if (existing.companyId !== (session.user.companyId ?? null)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { name, categoryId, price, cost, stockQty, lowStockThreshold } = body;
     const barcode = body.barcode?.trim() || null;
-
-    const { prisma } = await import("@/lib/prisma");
 
     const product = await prisma.product.update({
       where: { id: params.id },
@@ -116,6 +137,11 @@ export async function DELETE(
         { error: "Product not found" },
         { status: 404 }
       );
+    }
+
+    // Access check: non-superadmins can only delete products within their company
+    if (session.user.role.name !== "superadmin" && product.companyId !== (session.user.companyId ?? null)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const isAdmin = session.user.role.name === "admin" || session.user.role.name === "superadmin";
