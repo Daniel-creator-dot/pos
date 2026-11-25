@@ -14,6 +14,17 @@ import {
   ArrowLeft, ExternalLink, UserX, UserCheck
 } from "lucide-react";
 
+const emptyCompanyForm = {
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  adminName: "",
+  adminEmail: "",
+  adminPhone: "",
+  adminPassword: "",
+};
+
 interface Company {
   id: string;
   name: string;
@@ -78,7 +89,8 @@ export default function SuperadminDashboard() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   
   // Form States
-  const [companyForm, setCompanyForm] = useState({ name: "", email: "", phone: "", address: "" });
+  const [companyForm, setCompanyForm] = useState(emptyCompanyForm);
+  const [handoff, setHandoff] = useState<{ company: string; email: string; password: string } | null>(null);
   const [userForm, setUserForm] = useState({ name: "", email: "", password: "zxcv123$$", roleId: "", companyId: "", phone: "" });
   const [newPassword, setNewPassword] = useState("");
   
@@ -160,18 +172,28 @@ export default function SuperadminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(companyForm)
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setIsCompanyModalOpen(false);
-        setCompanyForm({ name: "", email: "", phone: "", address: "" });
-        setEditingCompany(null);
-        
-        if (viewingCompany && viewingCompany.id === updated.id) {
-          setViewingCompany(updated);
-        }
-        
-        fetchData();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Failed to save company");
+        return;
       }
+      const updated = data;
+      if (!editingCompany && updated.admin?.email) {
+        setHandoff({
+          company: updated.name,
+          email: updated.admin.email,
+          password: companyForm.adminPassword,
+        });
+      }
+      setIsCompanyModalOpen(false);
+      setCompanyForm(emptyCompanyForm);
+      setEditingCompany(null);
+        
+      if (viewingCompany && viewingCompany.id === updated.id) {
+        setViewingCompany(updated);
+      }
+
+      fetchData();
     } catch (err) {
       console.error("Error saving company:", err);
     }
@@ -470,7 +492,11 @@ export default function SuperadminDashboard() {
                 {viewingCompany ? viewingCompany.name : `${activeTab.replace("-", " ")} Management`}
               </h1>
               <p className="text-sm text-slate-500">
-                {viewingCompany ? `Detailed view of ${viewingCompany.name}` : `Manage platform-wide ${activeTab}`}
+                {viewingCompany
+                  ? `Detailed view of ${viewingCompany.name}`
+                  : activeTab === "companies"
+                  ? "Each company is a separate shop. Their products, sales, and stock stay inside that shop."
+                  : `Manage platform-wide ${activeTab}`}
               </p>
             </div>
           </div>
@@ -491,7 +517,7 @@ export default function SuperadminDashboard() {
                 <button 
                   onClick={() => {
                     if (activeTab === "companies") {
-                      setCompanyForm({ name: "", email: "", phone: "", address: "" });
+                      setCompanyForm(emptyCompanyForm);
                       setIsCompanyModalOpen(true);
                     } else {
                       setEditingUser(null);
@@ -502,7 +528,7 @@ export default function SuperadminDashboard() {
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 w-full sm:w-auto"
                 >
                   {activeTab === "companies" ? <Building2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                  Add {activeTab === "companies" ? "Company" : "User"}
+                  Add {activeTab === "companies" ? "shop" : "User"}
                 </button>
               )}
             </div>
@@ -629,6 +655,10 @@ export default function SuperadminDashboard() {
                             email: viewingCompany.email || "",
                             phone: viewingCompany.phone || "",
                             address: viewingCompany.address || "",
+                            adminName: "",
+                            adminEmail: "",
+                            adminPhone: "",
+                            adminPassword: "",
                           });
                           setIsCompanyModalOpen(true);
                         }}
@@ -1049,10 +1079,37 @@ export default function SuperadminDashboard() {
         </div>
       </main>
 
+      {handoff && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setHandoff(null)}></div>
+          <div className="relative bg-white border border-slate-200 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div className="p-8 space-y-4">
+              <h2 className="text-2xl font-black text-slate-900">Shop is ready</h2>
+              <p className="text-sm text-slate-500">Give these details to {handoff.company}. They sign in with this email and only see their own shop.</p>
+              <div className="bg-slate-50 rounded-2xl p-4 text-sm space-y-2">
+                <p><span className="text-slate-500">Shop:</span> <span className="font-bold text-slate-900">{handoff.company}</span></p>
+                <p><span className="text-slate-500">Email:</span> <span className="font-bold text-slate-900">{handoff.email}</span></p>
+                <p><span className="text-slate-500">Password:</span> <span className="font-bold text-slate-900">{handoff.password}</span></p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(`Shop: ${handoff.company}\nEmail: ${handoff.email}\nPassword: ${handoff.password}`);
+                }}
+                className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold"
+              >
+                Copy details
+              </button>
+              <button type="button" onClick={() => setHandoff(null)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       {isCompanyModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm({ name: "", email: "", phone: "", address: "" }); }}></div>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm(emptyCompanyForm); }}></div>
           <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="p-6 sm:p-10">
               <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
@@ -1077,9 +1134,33 @@ export default function SuperadminDashboard() {
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Address</label>
                   <textarea rows={2} className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-slate-900" value={companyForm.address} onChange={(e) => setCompanyForm({...companyForm, address: e.target.value})} />
                 </div>
+                {!editingCompany && (
+                  <div className="space-y-4 border-t border-slate-100 pt-4">
+                    <p className="text-sm font-bold text-slate-900">Shop owner login</p>
+                    <p className="text-xs text-slate-500">This is the account you give to the shop. They only see their own company.</p>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Owner name</label>
+                      <input required className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={companyForm.adminName} onChange={(e) => setCompanyForm({...companyForm, adminName: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Login email</label>
+                        <input required type="email" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={companyForm.adminEmail} onChange={(e) => setCompanyForm({...companyForm, adminEmail: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Owner phone</label>
+                        <input required className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={companyForm.adminPhone} onChange={(e) => setCompanyForm({...companyForm, adminPhone: e.target.value})} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Temporary password</label>
+                      <input required minLength={6} type="text" className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" value={companyForm.adminPassword} onChange={(e) => setCompanyForm({...companyForm, adminPassword: e.target.value})} />
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <button type="button" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm({ name: "", email: "", phone: "", address: "" }); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">{editingCompany ? "Update" : "Create"}</button>
+                  <button type="button" onClick={() => { setIsCompanyModalOpen(false); setEditingCompany(null); setCompanyForm(emptyCompanyForm); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold order-2 sm:order-1">Cancel</button>
+                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold order-1 sm:order-2 shadow-lg shadow-indigo-500/20">{editingCompany ? "Update" : "Create shop"}</button>
                 </div>
               </form>
             </div>

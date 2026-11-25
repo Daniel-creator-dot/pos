@@ -65,6 +65,7 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
           include: {
             role: true,
+            company: true,
           },
         });
 
@@ -83,6 +84,10 @@ export const authOptions: NextAuthOptions = {
 
         if (user.isActive === false) {
           throw new Error("Your account has been deactivated. Please contact support.");
+        }
+
+        if (user.company && user.company.status !== "ACTIVE") {
+          throw new Error("This shop has been suspended. Contact the platform owner.");
         }
 
         return {
