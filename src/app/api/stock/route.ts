@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { stockAdjustment } from "@/lib/checkout";
 
 // GET /api/stock - Get all stock movements
 export async function GET() {
@@ -94,42 +95,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // For OUT adjustments, check if there's enough stock
-    if (type === "OUT" && product.stockQty < qty) {
-      return NextResponse.json(
-        { error: "Insufficient stock for this adjustment" },
-        { status: 400 }
-      );
+    const adjustment = stockAdjustment(product.stockQty, type, Number(qty));
+    if ("error" in adjustment) {
+      return NextResponse.json({ error: adjustment.error }, { status: 400 });
     }
 
-    // Create stock movement and update product stock
-    const movement = await prisma.stockMovement.create({
-      data: {
-        productId,
-        type,
-        qty,
-        reason,
-        userId: session.user.id,
-      },
-      include: {
-        product: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
+    const movement = await prisma.$transaction(async (tx) => {
+      const created = await tx.stockMovement.create({
+        data: {
+          productId,
+          type,
+          qty: adjustment.movementQty,
+          reason,
+          userId: session.user.id,
+        },
+        include: {
+          product: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Update product stock
-    await prisma.product.update({
-      where: { id: productId },
-      data: {
-        stockQty: {
-          [type === "IN" ? "increment" : "decrement"]: qty,
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          stockQty: adjustment.nextQty,
         },
-      },
+      });
+
+      return created;
     });
 
     return NextResponse.json(movement, { status: 201 });

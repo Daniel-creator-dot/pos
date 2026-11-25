@@ -19,6 +19,7 @@ import {
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { formatCurrency } from "@/lib/currency";
+import { checkoutTotals } from "@/lib/checkout";
 
 interface Product {
   id: string;
@@ -61,6 +62,7 @@ export default function POSPage() {
   const [processing, setProcessing] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [currency, setCurrency] = useState("USD");
+  const [taxRate, setTaxRate] = useState(0);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   // Monitor online status
@@ -88,6 +90,7 @@ export default function POSPage() {
         if (settingsRes?.ok) {
           const data = await settingsRes.json();
           setCurrency(data.currency || "USD");
+          setTaxRate(Number(data.taxRate) || 0);
         }
 
         if (productsRes?.ok) {
@@ -192,8 +195,10 @@ export default function POSPage() {
     (sum, item) => sum + item.product.price * item.quantity,
     0
   );
-  const discountAmount = subtotal * (discount / 100);
-  const total = subtotal - discountAmount;
+  const totals = checkoutTotals(subtotal, discount, taxRate);
+  const discountAmount = totals.discountAmount;
+  const taxAmount = totals.tax;
+  const total = totals.total;
 
   // Complete sale
   const completeSale = async () => {
@@ -312,7 +317,18 @@ export default function POSPage() {
                   {lastSale.discount > 0 && (
                     <div className="flex justify-between text-red-600">
                       <span>Discount ({lastSale.discount}%):</span>
-                      <span>-{formatCurrency(lastSale.discountAmount, currency)}</span>
+                      <span>
+                        -{formatCurrency(
+                          lastSale.subtotal * (Number(lastSale.discount) / 100),
+                          currency
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {Number(lastSale.tax) > 0 && (
+                    <div className="flex justify-between">
+                      <span>Tax:</span>
+                      <span>{formatCurrency(lastSale.tax, currency)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-lg">
@@ -759,6 +775,12 @@ export default function POSPage() {
                 <div className="flex justify-between text-red-600">
                   <span>Discount:</span>
                   <span>-{formatCurrency(discountAmount, currency)}</span>
+                </div>
+              )}
+              {taxRate > 0 && (
+                <div className="flex justify-between text-gray-600">
+                  <span>Tax ({taxRate}%):</span>
+                  <span>{formatCurrency(taxAmount, currency)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">

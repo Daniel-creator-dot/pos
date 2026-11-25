@@ -143,11 +143,47 @@ export async function GET(request: Request) {
       })
     );
 
+    const salesForProfit = await prisma.sale.findMany({
+      where: {
+        ...whereClause,
+        ...(dateFilter ? { createdAt: dateFilter } : {}),
+      },
+      select: {
+        subtotal: true,
+        discount: true,
+        payments: { select: { method: true, amount: true } },
+        saleItems: {
+          select: { qty: true, product: { select: { cost: true } } },
+        },
+      },
+    });
+
+    let grossProfit = 0;
+    const paymentTotals: Record<string, number> = {};
+    for (const sale of salesForProfit) {
+      const discountAmount = sale.subtotal * ((sale.discount || 0) / 100);
+      const cost = sale.saleItems.reduce(
+        (sum, item) => sum + item.qty * (item.product.cost || 0),
+        0
+      );
+      grossProfit += sale.subtotal - discountAmount - cost;
+      for (const payment of sale.payments) {
+        paymentTotals[payment.method] =
+          (paymentTotals[payment.method] || 0) + payment.amount;
+      }
+    }
+
+    const paymentsByMethod = Object.entries(paymentTotals).map(
+      ([method, amount]) => ({ method, amount })
+    );
+
     return NextResponse.json({
       totalSales: totalSalesResult._sum.total || 0,
       totalOrders: totalSalesResult._count.id || 0,
       totalProducts,
       lowStockItems,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      paymentsByMethod,
       topProducts,
       salesByCategory,
     });

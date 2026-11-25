@@ -37,6 +37,33 @@ export async function GET() {
     const todaySales = todaySalesResult._sum.total || 0;
     const todayOrders = todaySalesResult._count.id || 0;
 
+    const todaySaleRows = await prisma.sale.findMany({
+      where: {
+        companyId: session.user.companyId,
+        createdAt: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      },
+      select: {
+        subtotal: true,
+        discount: true,
+        saleItems: {
+          select: { qty: true, product: { select: { cost: true } } },
+        },
+      },
+    });
+    const todayProfit = Math.round(
+      todaySaleRows.reduce((sum, sale) => {
+        const discountAmount = sale.subtotal * ((sale.discount || 0) / 100);
+        const cost = sale.saleItems.reduce(
+          (itemSum, item) => itemSum + item.qty * (item.product.cost || 0),
+          0
+        );
+        return sum + sale.subtotal - discountAmount - cost;
+      }, 0) * 100
+    ) / 100;
+
     // Get all active products and filter for low stock
     const products = await prisma.product.findMany({
       where: {
@@ -119,6 +146,7 @@ export async function GET() {
     return NextResponse.json({
       todaySales,
       todayOrders,
+      todayProfit,
       lowStockItems,
       totalProducts,
       topProducts: formattedTopProducts,

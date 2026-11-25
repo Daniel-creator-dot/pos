@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Database, AlertTriangle, ArrowUp, ArrowDown, Package } from "lucide-react";
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import Modal from "@/components/Modal";
 
 interface Product {
   id: string;
@@ -32,6 +33,18 @@ export default function StockPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [adjustForm, setAdjustForm] = useState({
+    productId: "",
+    type: "IN" as "IN" | "OUT" | "ADJUSTMENT",
+    qty: "",
+    reason: "",
+  });
+
+  const canAdjust = ["admin", "superadmin", "manager", "storekeeper"].includes(
+    session?.user?.role?.name || ""
+  );
 
   useEffect(() => {
     fetchData();
@@ -64,6 +77,36 @@ export default function StockPage() {
     (p) => p.stockQty <= p.lowStockThreshold
   );
 
+  const submitAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const response = await fetch("/api/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: adjustForm.productId,
+          type: adjustForm.type,
+          qty: Number(adjustForm.qty),
+          reason: adjustForm.reason || null,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(data.error || "Failed to adjust stock");
+        return;
+      }
+      setAdjustOpen(false);
+      setAdjustForm({ productId: "", type: "IN", qty: "", reason: "" });
+      await fetchData();
+    } catch (error) {
+      console.error("Stock adjustment failed:", error);
+      alert("Failed to adjust stock");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <AuthenticatedLayout>
@@ -78,11 +121,98 @@ export default function StockPage() {
     <AuthenticatedLayout>
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Track inventory levels and movements</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
+            <p className="text-sm text-gray-500 mt-1">Track inventory levels and movements</p>
+          </div>
+          {canAdjust && (
+            <button
+              onClick={() => setAdjustOpen(true)}
+              className="btn btn-primary"
+            >
+              Adjust stock
+            </button>
+          )}
         </div>
       </header>
+
+      <Modal
+        isOpen={adjustOpen}
+        onClose={() => setAdjustOpen(false)}
+        title="Adjust stock"
+      >
+        <form onSubmit={submitAdjustment} className="space-y-4">
+          <div>
+            <label className="label block mb-1">Product</label>
+            <select
+              required
+              className="input w-full"
+              value={adjustForm.productId}
+              onChange={(e) => setAdjustForm({ ...adjustForm, productId: e.target.value })}
+            >
+              <option value="">Select a product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} ({product.stockQty} in stock)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label block mb-1">Type</label>
+            <select
+              className="input w-full"
+              value={adjustForm.type}
+              onChange={(e) =>
+                setAdjustForm({
+                  ...adjustForm,
+                  type: e.target.value as "IN" | "OUT" | "ADJUSTMENT",
+                })
+              }
+            >
+              <option value="IN">Stock in</option>
+              <option value="OUT">Stock out</option>
+              <option value="ADJUSTMENT">Count (set quantity)</option>
+            </select>
+          </div>
+          <div>
+            <label className="label block mb-1">
+              {adjustForm.type === "ADJUSTMENT" ? "Counted quantity" : "Quantity"}
+            </label>
+            <input
+              required
+              type="number"
+              min="0"
+              step="1"
+              className="input w-full"
+              value={adjustForm.qty}
+              onChange={(e) => setAdjustForm({ ...adjustForm, qty: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label block mb-1">Reason</label>
+            <input
+              className="input w-full"
+              value={adjustForm.reason}
+              onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
+              placeholder="Delivery, damage, stock count..."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setAdjustOpen(false)}
+              className="btn btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="btn btn-primary flex-1">
+              {saving ? "Saving..." : "Save adjustment"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <main className="p-6 max-w-7xl mx-auto">
         {/* Low Stock Alert */}

@@ -17,6 +17,7 @@ import { formatCurrency } from "@/lib/currency";
 interface DashboardStats {
   todaySales: number;
   todayOrders: number;
+  todayProfit: number;
   lowStockItems: number;
   totalProducts: number;
   topProducts: { name: string; totalSold: number; revenue: number }[];
@@ -105,6 +106,23 @@ export default function DashboardPage() {
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Today's profit, after discount and before tax */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">
+                  Today&apos;s Profit
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">
+                  {formatCurrency(stats?.todayProfit ?? 0, currency)}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-emerald-600" />
               </div>
             </div>
           </div>

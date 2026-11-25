@@ -12,6 +12,8 @@ interface ReportData {
   totalOrders: number;
   totalProducts: number;
   lowStockItems: number;
+  grossProfit: number;
+  paymentsByMethod: { method: string; amount: number }[];
   salesByCategory: { category: string; total: number }[];
   topProducts: { name: string; totalSold: number; revenue: number }[];
 }
@@ -74,7 +76,14 @@ export default function ReportsPage() {
     csvContent += `Total Sales,${formatCurrency(reportData.totalSales, currency)}\n`;
     csvContent += `Total Orders,${reportData.totalOrders}\n`;
     csvContent += `Total Products,${reportData.totalProducts}\n`;
-    csvContent += `Low Stock Items,${reportData.lowStockItems}\n\n`;
+    csvContent += `Low Stock Items,${reportData.lowStockItems}\n`;
+    csvContent += `Gross Profit,${formatCurrency(reportData.grossProfit || 0, currency)}\n\n`;
+    csvContent += "PAYMENTS\n";
+    csvContent += "Method,Amount\n";
+    (reportData.paymentsByMethod || []).forEach((payment) => {
+      csvContent += `${payment.method},${formatCurrency(payment.amount, currency)}\n`;
+    });
+    csvContent += "\n";
     csvContent += "TOP PRODUCTS\n";
     csvContent += "Product Name,Units Sold,Revenue\n";
     reportData.topProducts.forEach((product) => {
@@ -198,6 +207,16 @@ export default function ReportsPage() {
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-gray-500">Gross Profit</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData?.grossProfit ?? 0, currency)}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-emerald-600" />
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-gray-500">Low Stock Items</p>
                 <p className="text-2xl font-bold text-red-600">{reportData?.lowStockItems || 0}</p>
               </div>
@@ -234,6 +253,26 @@ export default function ReportsPage() {
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm text-center py-8">No data available. Click "Generate Report" to load data.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2 className="text-lg font-semibold text-gray-900">Payments</h2>
+            </div>
+            <div className="card-content">
+              {reportData?.paymentsByMethod && reportData.paymentsByMethod.length > 0 ? (
+                <div className="space-y-3">
+                  {reportData.paymentsByMethod.map((payment) => (
+                    <div key={payment.method} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                      <span className="text-sm font-medium text-gray-900">{payment.method.replaceAll("_", " ")}</span>
+                      <span className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount, currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm text-center py-8">No payments in this period.</p>
               )}
             </div>
           </div>

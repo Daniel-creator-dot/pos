@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { checkoutTotals } from "@/lib/checkout";
 
 // POST /api/sales - Create a new sale
 export async function POST(request: Request) {
@@ -41,23 +42,23 @@ export async function POST(request: Request) {
 
     // Start a transaction to ensure data consistency
     const result = await prisma.$transaction(async (tx) => {
-      // Calculate subtotal
-      const subtotal = items.reduce(
-        (sum: number, item: { quantity: number; unitPrice: number }) =>
-          sum + item.quantity * item.unitPrice,
-        0
-      );
+      const pricedItems: {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        subtotal: number;
+      }[] = [];
 
-      // Calculate discount amount
-      const discountAmount = subtotal * (discount / 100);
-
-      // Calculate total
-      const total = subtotal - discountAmount;
-
-      // Verify stock availability for all items
+      // Sell at the catalog price and only from the cashier's company.
       for (const item of items) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
+        const product = await tx.product.findFirst({
+          where: {
+            id: item.productId,
+            isActive: true,
+            ...(session.user.role.name !== "superadmin"
+              ? { companyId: session.user.companyId ?? null }
+              : {}),
+          },
         });
 
         if (!product) {
@@ -69,6 +70,40 @@ export async function POST(request: Request) {
             `Insufficient stock for ${product.name}. Available: ${product.stockQty}`
           );
         }
+
+        const unitPrice = Number(product.price);
+        pricedItems.push({
+          productId: product.id,
+          quantity: item.quantity,
+          unitPrice,
+          subtotal: unitPrice * item.quantity,
+        });
+      }
+
+      const subtotal = pricedItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+      let taxRate = 0;
+      if (resolvedStoreId) {
+        const store = await tx.store.findUnique({
+          where: { id: resolvedStoreId },
+          select: { settings: true },
+        });
+        if (store?.settings) {
+          try {
+            taxRate = Number(JSON.parse(store.settings).taxRate) || 0;
+          } catch {
+            taxRate = 0;
+          }
+        }
+      }
+
+      const totals = checkoutTotals(subtotal, Number(discount) || 0, taxRate);
+      const totalPaid = (payments || []).reduce(
+        (sum: number, payment: { amount: number }) => sum + Number(payment.amount || 0),
+        0
+      );
+      if (totalPaid + 0.001 < totals.total) {
+        throw new Error("Insufficient payment amount");
       }
 
       // Generate receipt number
@@ -93,19 +128,20 @@ export async function POST(request: Request) {
           storeId: resolvedStoreId,
           companyId: session.user.companyId,
           subtotal,
-          discount,
-          total,
+          discount: totals.discountPercent,
+          tax: totals.tax,
+          total: totals.total,
           receiptNumber,
           saleItems: {
-            create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
+            create: pricedItems.map((item) => ({
               productId: item.productId,
               qty: item.quantity,
               unitPrice: item.unitPrice,
-              subtotal: item.quantity * item.unitPrice,
+              subtotal: item.subtotal,
             })),
           },
           payments: {
-            create: payments.map((p: { method: string; amount: number; reference?: string }) => ({
+            create: (payments || []).map((p: { method: string; amount: number; reference?: string }) => ({
               method: p.method,
               amount: p.amount,
               reference: p.reference,
@@ -123,7 +159,7 @@ export async function POST(request: Request) {
       });
 
       // Update stock and create stock movements
-      for (const item of items) {
+      for (const item of pricedItems) {
         // Decrease stock
         await tx.product.update({
           where: { id: item.productId },
