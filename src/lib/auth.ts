@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
+import { authorizeShopUser } from "./shop-account";
 
 declare module "next-auth" {
   interface Session {
@@ -58,50 +58,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password are required");
         }
 
-        // Dynamic import of Prisma to avoid module loading issues
         const { prisma } = await import("./prisma");
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: {
-            role: true,
-            company: true,
-          },
-        });
-
-        if (!user) {
-          throw new Error("Invalid email or password");
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-
-        if (!isPasswordValid) {
-          throw new Error("Invalid email or password");
-        }
-
-        if (user.isActive === false) {
-          throw new Error("Your account has been deactivated. Please contact support.");
-        }
-
-        if (user.company && user.company.status !== "ACTIVE") {
-          throw new Error("This shop has been suspended. Contact the platform owner.");
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          roleId: user.roleId,
-          storeId: user.storeId,
-          companyId: user.companyId,
-          role: {
-            name: user.role.name,
-            permissions: user.role.permissions,
-          },
-        };
+        return authorizeShopUser(prisma, credentials.email, credentials.password);
       },
     }),
   ],

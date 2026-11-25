@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Package, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { publicLoginError } from "@/lib/login-error";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        setError(publicLoginError(result.error));
         setLoading(false);
       }
       // Session will update automatically, and the useEffect will handle redirect
