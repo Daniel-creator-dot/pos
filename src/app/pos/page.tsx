@@ -27,6 +27,8 @@ interface Product {
   barcode: string | null;
   price: number;
   stockQty: number;
+  shopQty?: number;
+  warehouseQty?: number;
   lowStockThreshold: number;
   category: { name: string } | null;
 }
@@ -150,14 +152,17 @@ export default function POSPage() {
     }
   };
 
+  const availableQty = (product: Product) =>
+    typeof product.shopQty === "number" ? product.shopQty : product.stockQty;
+
   // Add to cart
   const addToCart = (product: Product) => {
-    if (product.stockQty <= 0) return;
+    if (availableQty(product) <= 0) return;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stockQty) return prev;
+        if (existing.quantity >= availableQty(product)) return prev;
         return prev.map((item) =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
@@ -176,7 +181,7 @@ export default function POSPage() {
           if (item.product.id === productId) {
             const newQty = item.quantity + delta;
             if (newQty <= 0) return null;
-            if (newQty > item.product.stockQty) return item;
+            if (newQty > availableQty(item.product)) return item;
             return { ...item, quantity: newQty };
           }
           return item;
@@ -650,7 +655,7 @@ export default function POSPage() {
                   key={product.id}
                   onClick={() => addToCart(product)}
                   className={`product-card ${
-                    product.stockQty <= 0 ? "opacity-50 cursor-not-allowed" : ""
+                    availableQty(product) <= 0 ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
                   <div className="font-medium text-gray-900 truncate text-sm sm:text-base">
@@ -665,12 +670,13 @@ export default function POSPage() {
                     </span>
                     <span
                       className={`text-xs ${
-                        product.stockQty <= product.lowStockThreshold
+                        availableQty(product) <= product.lowStockThreshold
                           ? "text-red-600"
                           : "text-gray-500"
                       }`}
                     >
-                      Stock: {product.stockQty}
+                      Shop: {availableQty(product)}
+                      {(product.warehouseQty ?? 0) > 0 ? ` · Warehouse: ${product.warehouseQty}` : ""}
                     </span>
                   </div>
                 </div>
@@ -735,7 +741,7 @@ export default function POSPage() {
                       <button
                         onClick={() => updateQuantity(item.product.id, 1)}
                         className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300"
-                        disabled={item.quantity >= item.product.stockQty}
+                        disabled={item.quantity >= availableQty(item.product)}
                       >
                         <Plus className="w-3 h-3" />
                       </button>

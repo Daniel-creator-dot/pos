@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { stockAdjustment } from "@/lib/checkout";
+import { changeLocationStock, ensureCompanyLocations, locationQty } from "@/lib/locations";
 
 // GET /api/stock - Get all stock movements
 export async function GET() {
@@ -37,6 +38,13 @@ export async function GET() {
             name: true,
           },
         },
+        store: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
       },
     });
 
@@ -69,9 +77,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { productId, type, qty, reason } = body;
+    const { productId, type, qty, reason, storeId } = body;
 
-    if (!productId || !type || !qty) {
+    if (type !== "IN" && type !== "OUT" && type !== "ADJUSTMENT") {
+      return NextResponse.json(
+        { error: "Type must be IN, OUT, or ADJUSTMENT" },
+        { status: 400 }
+      );
+    }
+
+    if (!productId || qty === undefined || qty === null || qty === "") {
       return NextResponse.json(
         { error: "Product ID, type, and quantity are required" },
         { status: 400 }
@@ -95,47 +110,67 @@ export async function POST(request: Request) {
       );
     }
 
-    const adjustment = stockAdjustment(product.stockQty, type, Number(qty));
-    if ("error" in adjustment) {
-      return NextResponse.json({ error: adjustment.error }, { status: 400 });
-    }
+    const companyId =
+      session.user.role.name === "superadmin"
+        ? product.companyId
+        : session.user.companyId;
 
     const movement = await prisma.$transaction(async (tx) => {
-      const created = await tx.stockMovement.create({
-        data: {
-          productId,
-          type,
-          qty: adjustment.movementQty,
-          reason,
-          userId: session.user.id,
-        },
-        include: {
-          product: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-            },
+      if (!companyId) {
+        const adjustment = stockAdjustment(product.stockQty, type, Number(qty));
+        if ("error" in adjustment) {
+          throw new Error(adjustment.error);
+        }
+        await tx.product.update({
+          where: { id: productId },
+          data: { stockQty: adjustment.nextQty },
+        });
+        return tx.stockMovement.create({
+          data: {
+            productId,
+            type,
+            qty: adjustment.movementQty,
+            reason,
+            userId: session.user.id,
           },
-        },
-      });
+          include: {
+            product: true,
+            user: { select: { id: true, name: true } },
+          },
+        });
+      }
 
-      await tx.product.update({
-        where: { id: productId },
-        data: {
-          stockQty: adjustment.nextQty,
-        },
-      });
+      const locations = await ensureCompanyLocations(tx, companyId);
+      const targetId = storeId || locations.shop.id;
+      if (targetId !== locations.shop.id && targetId !== locations.warehouse.id) {
+        throw new Error("Choose the shop or the warehouse");
+      }
 
-      return created;
+      const current = await locationQty(tx, productId, targetId);
+      const adjustment = stockAdjustment(current, type, Number(qty));
+      if ("error" in adjustment) {
+        throw new Error(adjustment.error);
+      }
+
+      return changeLocationStock(tx, {
+        productId,
+        storeId: targetId,
+        delta: adjustment.nextQty - current,
+        movementType: type,
+        movementQty: adjustment.movementQty,
+        reason,
+        userId: session.user.id,
+      });
     });
 
     return NextResponse.json(movement, { status: 201 });
   } catch (error) {
     console.error("Stock API Error:", error);
+    const message = error instanceof Error ? error.message : "Failed to create stock movement";
+    const clientError = /Insufficient|Quantity|Type must|already|Choose the shop/.test(message);
     return NextResponse.json(
-      { error: "Failed to create stock movement" },
-      { status: 500 }
+      { error: clientError ? message : "Failed to create stock movement" },
+      { status: clientError ? 400 : 500 }
     );
   }
 }

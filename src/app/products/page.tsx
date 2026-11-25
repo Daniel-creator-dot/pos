@@ -26,6 +26,8 @@ interface Product {
   price: number;
   cost: number;
   stockQty: number;
+  shopQty?: number;
+  warehouseQty?: number;
   lowStockThreshold: number;
   isActive: boolean;
   isPendingDelete?: boolean;
@@ -360,7 +362,8 @@ export default function ProductsPage() {
                           : "bg-green-100 text-green-700 font-medium"
                       }`}
                     >
-                      Stock: {product.stockQty}
+                      Shop: {product.shopQty ?? product.stockQty}
+                      {(product.warehouseQty ?? 0) > 0 ? ` · Warehouse: ${product.warehouseQty}` : ""}
                     </span>
                   </div>
 

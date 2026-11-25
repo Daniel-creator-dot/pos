@@ -72,3 +72,23 @@ export function stockAdjustment(
 
   return { error: "Type must be IN, OUT, or ADJUSTMENT" };
 }
+
+export function transferQuantity(sourceQty: number, qty: number): { qty: number } | { error: string } {
+  if (!Number.isInteger(qty) || qty <= 0) {
+    return { error: "Quantity must be a whole number greater than 0" };
+  }
+  if (sourceQty < qty) {
+    return { error: "Not enough stock at the source location" };
+  }
+  return { qty };
+}
+
+export function sellableQty(
+  stockQty: number,
+  levels: { qty: number; kind: string }[]
+) {
+  if (levels.length === 0) return stockQty;
+  return levels
+    .filter((level) => level.kind === "STORE")
+    .reduce((sum, level) => sum + level.qty, 0);
+}

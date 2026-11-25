@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { changeLocationStock, ensureCompanyLocations } from "@/lib/locations";
 
 // GET /api/purchases/[id] - Get a single purchase
 export async function GET(
@@ -119,28 +120,37 @@ export async function PUT(
 
       // If status is updated to COMPLETED, increment stock levels and create stock movements
       if (status === "COMPLETED" && purchase.status === "PENDING") {
+        const locations = purchase.companyId
+          ? await ensureCompanyLocations(tx, purchase.companyId)
+          : null;
         for (const item of purchase.purchaseItems) {
-          // Increment product stock
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stockQty: {
-                increment: item.qty,
-              },
-            },
-          });
-
-          // Log stock movement
-          await tx.stockMovement.create({
-            data: {
+          if (locations) {
+            await changeLocationStock(tx, {
               productId: item.productId,
-              type: "IN",
-              qty: item.qty,
-              reason: "Purchase Completion",
+              storeId: locations.warehouse.id,
+              delta: item.qty,
+              movementType: "IN",
+              movementQty: item.qty,
+              reason: "Purchase received into warehouse",
               userId: session.user.id,
               reference: purchase.id,
-            },
-          });
+            });
+          } else {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stockQty: { increment: item.qty } },
+            });
+            await tx.stockMovement.create({
+              data: {
+                productId: item.productId,
+                type: "IN",
+                qty: item.qty,
+                reason: "Purchase Completion",
+                userId: session.user.id,
+                reference: purchase.id,
+              },
+            });
+          }
         }
       }
 
@@ -196,18 +206,29 @@ export async function DELETE(
     await prisma.$transaction(async (tx) => {
       // Revert stock changes if the purchase was COMPLETED
       if (purchase.status === "COMPLETED") {
+        const locations = purchase.companyId
+          ? await ensureCompanyLocations(tx, purchase.companyId)
+          : null;
         for (const item of purchase.purchaseItems) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stockQty: {
-                decrement: item.qty,
-              },
-            },
-          });
+          if (locations) {
+            await changeLocationStock(tx, {
+              productId: item.productId,
+              storeId: locations.warehouse.id,
+              delta: -item.qty,
+              movementType: "OUT",
+              movementQty: item.qty,
+              reason: "Purchase deleted",
+              userId: session.user.id,
+              reference: purchase.id,
+            });
+          } else {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stockQty: { decrement: item.qty } },
+            });
+          }
         }
 
-        // Delete associated stock movements
         await tx.stockMovement.deleteMany({
           where: {
             reference: purchase.id,

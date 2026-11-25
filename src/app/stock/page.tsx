@@ -12,6 +12,10 @@ interface Product {
   name: string;
   barcode: string | null;
   stockQty: number;
+  shopQty?: number;
+  warehouseQty?: number;
+  shopId?: string | null;
+  warehouseId?: string | null;
   lowStockThreshold: number;
   category: { name: string } | null;
 }
@@ -26,6 +30,7 @@ interface StockMovement {
   createdAt: string;
   user: { name: string } | null;
   product: { name: string };
+  store?: { name: string; kind: string } | null;
 }
 
 export default function StockPage() {
@@ -37,9 +42,16 @@ export default function StockPage() {
   const [saving, setSaving] = useState(false);
   const [adjustForm, setAdjustForm] = useState({
     productId: "",
+    storeId: "",
     type: "IN" as "IN" | "OUT" | "ADJUSTMENT",
     qty: "",
     reason: "",
+  });
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    productId: "",
+    qty: "",
+    direction: "TO_SHOP" as "TO_SHOP" | "TO_WAREHOUSE",
   });
 
   const canAdjust = ["admin", "superadmin", "manager", "storekeeper"].includes(
@@ -73,8 +85,12 @@ export default function StockPage() {
     }
   };
 
+  const shopQtyOf = (product: Product) =>
+    typeof product.shopQty === "number" ? product.shopQty : product.stockQty;
+  const warehouseQtyOf = (product: Product) => product.warehouseQty ?? 0;
+
   const lowStockProducts = products.filter(
-    (p) => p.stockQty <= p.lowStockThreshold
+    (product) => shopQtyOf(product) <= product.lowStockThreshold
   );
 
   const submitAdjustment = async (e: React.FormEvent) => {
@@ -89,6 +105,7 @@ export default function StockPage() {
           type: adjustForm.type,
           qty: Number(adjustForm.qty),
           reason: adjustForm.reason || null,
+          storeId: adjustForm.storeId || undefined,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -97,11 +114,40 @@ export default function StockPage() {
         return;
       }
       setAdjustOpen(false);
-      setAdjustForm({ productId: "", type: "IN", qty: "", reason: "" });
+      setAdjustForm({ productId: "", storeId: "", type: "IN", qty: "", reason: "" });
       await fetchData();
     } catch (error) {
       console.error("Stock adjustment failed:", error);
       alert("Failed to adjust stock");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const response = await fetch("/api/stock/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: transferForm.productId,
+          qty: Number(transferForm.qty),
+          direction: transferForm.direction,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(data.error || "Failed to transfer stock");
+        return;
+      }
+      setTransferOpen(false);
+      setTransferForm({ productId: "", qty: "", direction: "TO_SHOP" });
+      await fetchData();
+    } catch (error) {
+      console.error("Transfer failed:", error);
+      alert("Failed to transfer stock");
     } finally {
       setSaving(false);
     }
@@ -127,12 +173,14 @@ export default function StockPage() {
             <p className="text-sm text-gray-500 mt-1">Track inventory levels and movements</p>
           </div>
           {canAdjust && (
-            <button
-              onClick={() => setAdjustOpen(true)}
-              className="btn btn-primary"
-            >
-              Adjust stock
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setTransferOpen(true)} className="btn btn-secondary">
+                Transfer
+              </button>
+              <button onClick={() => setAdjustOpen(true)} className="btn btn-primary">
+                Adjust stock
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -149,14 +197,42 @@ export default function StockPage() {
               required
               className="input w-full"
               value={adjustForm.productId}
-              onChange={(e) => setAdjustForm({ ...adjustForm, productId: e.target.value })}
+              onChange={(e) => {
+                const product = products.find((item) => item.id === e.target.value);
+                setAdjustForm({
+                  ...adjustForm,
+                  productId: e.target.value,
+                  storeId: product?.shopId || "",
+                });
+              }}
             >
               <option value="">Select a product</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name} ({product.stockQty} in stock)
+                  {product.name} (shop {shopQtyOf(product)}, warehouse {warehouseQtyOf(product)})
                 </option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="label block mb-1">Location</label>
+            <select
+              required
+              className="input w-full"
+              value={adjustForm.storeId}
+              onChange={(e) => setAdjustForm({ ...adjustForm, storeId: e.target.value })}
+            >
+              <option value="">Select a location</option>
+              {products.find((product) => product.id === adjustForm.productId)?.shopId && (
+                <option value={products.find((product) => product.id === adjustForm.productId)?.shopId || ""}>
+                  Shop
+                </option>
+              )}
+              {products.find((product) => product.id === adjustForm.productId)?.warehouseId && (
+                <option value={products.find((product) => product.id === adjustForm.productId)?.warehouseId || ""}>
+                  Warehouse
+                </option>
+              )}
             </select>
           </div>
           <div>
@@ -214,6 +290,70 @@ export default function StockPage() {
         </form>
       </Modal>
 
+      <Modal
+        isOpen={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        title="Transfer stock"
+      >
+        <form onSubmit={submitTransfer} className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Supplier deliveries sit in the warehouse. Move them to the shop before they can be sold.
+          </p>
+          <div>
+            <label className="label block mb-1">Product</label>
+            <select
+              required
+              className="input w-full"
+              value={transferForm.productId}
+              onChange={(e) => setTransferForm({ ...transferForm, productId: e.target.value })}
+            >
+              <option value="">Select a product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} (shop {shopQtyOf(product)}, warehouse {warehouseQtyOf(product)})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label block mb-1">Direction</label>
+            <select
+              className="input w-full"
+              value={transferForm.direction}
+              onChange={(e) =>
+                setTransferForm({
+                  ...transferForm,
+                  direction: e.target.value as "TO_SHOP" | "TO_WAREHOUSE",
+                })
+              }
+            >
+              <option value="TO_SHOP">Warehouse to shop</option>
+              <option value="TO_WAREHOUSE">Shop to warehouse</option>
+            </select>
+          </div>
+          <div>
+            <label className="label block mb-1">Quantity</label>
+            <input
+              required
+              type="number"
+              min="1"
+              step="1"
+              className="input w-full"
+              value={transferForm.qty}
+              onChange={(e) => setTransferForm({ ...transferForm, qty: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setTransferOpen(false)} className="btn btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="btn btn-primary flex-1">
+              {saving ? "Moving..." : "Move stock"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       <main className="p-6 max-w-7xl mx-auto">
         {/* Low Stock Alert */}
         {lowStockProducts.length > 0 && (
@@ -221,9 +361,11 @@ export default function StockPage() {
             <AlertTriangle className="w-5 h-5 text-red-600" />
             <div>
               <p className="font-medium text-red-800">
-                {lowStockProducts.length} product(s) are low on stock
+                {lowStockProducts.length} product(s) are low on the shop floor
               </p>
-              <p className="text-sm text-red-600">Products that need restocking</p>
+              <p className="text-sm text-red-600">
+                Transfer from the warehouse, or buy more stock
+              </p>
             </div>
           </div>
         )}
@@ -240,7 +382,8 @@ export default function StockPage() {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">In Stock</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Shop</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Warehouse</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Low Threshold</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Status</th>
                   </tr>
@@ -250,17 +393,22 @@ export default function StockPage() {
                     <tr key={product.id}>
                       <td className="px-4 py-3 text-sm text-gray-900">{product.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{product.category?.name || "N/A"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{product.stockQty}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{shopQtyOf(product)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{warehouseQtyOf(product)}</td>
                       <td className="px-4 py-3 text-sm text-gray-500 text-right">{product.lowStockThreshold}</td>
                       <td className="px-4 py-3 text-right">
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${
-                            product.stockQty <= product.lowStockThreshold
+                            shopQtyOf(product) <= product.lowStockThreshold
                               ? "bg-red-100 text-red-700"
                               : "bg-green-100 text-green-700"
                           }`}
                         >
-                          {product.stockQty <= product.lowStockThreshold ? "Low Stock" : "OK"}
+                          {shopQtyOf(product) <= product.lowStockThreshold
+                            ? warehouseQtyOf(product) > 0
+                              ? "Move from warehouse"
+                              : "Low on shop floor"
+                            : "OK"}
                         </span>
                       </td>
                     </tr>
@@ -285,6 +433,7 @@ export default function StockPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">By</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -313,6 +462,13 @@ export default function StockPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">{movement.qty}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {movement.store?.kind === "WAREHOUSE"
+                            ? "Warehouse"
+                            : movement.store
+                            ? "Shop"
+                            : "-"}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-500">{movement.reason || "-"}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{movement.user?.name || "-"}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">

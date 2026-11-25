@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { startOfDay, endOfDay } from "date-fns";
+import { sellableQty } from "@/lib/checkout";
 
 export async function GET() {
   try {
@@ -73,13 +74,17 @@ export async function GET() {
       select: {
         stockQty: true,
         lowStockThreshold: true,
+        stockLevels: { select: { qty: true, store: { select: { kind: true } } } },
       },
     });
 
-    const lowStockItems = products.filter(
-      (p: { stockQty: number; lowStockThreshold: number }) =>
-        p.stockQty <= p.lowStockThreshold
-    ).length;
+    const lowStockItems = products.filter((product) => {
+      const available = sellableQty(
+        product.stockQty,
+        product.stockLevels.map((level) => ({ qty: level.qty, kind: level.store.kind }))
+      );
+      return available <= product.lowStockThreshold;
+    }).length;
 
     // Get total products
     const totalProducts = products.length;

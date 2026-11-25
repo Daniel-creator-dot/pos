@@ -472,6 +472,9 @@ export default function PurchasesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Status</p>
+                    {selectedPurchase.status === "PENDING" && (
+                      <p className="text-xs text-gray-500 mt-1">Completing this purchase receives the goods into the warehouse.</p>
+                    )}
                     <span className={`inline-block px-2 py-1 rounded-full text-xs ${
                       selectedPurchase.status === "COMPLETED"
                         ? "bg-green-100 text-green-700"

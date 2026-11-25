@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { changeLocationStock, ensureCompanyLocations } from "@/lib/locations";
 
 // GET /api/products/[id] - Get a single product
 export async function GET(
@@ -60,23 +61,55 @@ export async function PUT(
 
     const { prisma } = await import("@/lib/prisma");
 
-    const product = await prisma.product.update({
-      where: { id: params.id },
-      data: {
-        name,
-        barcode,
-        categoryId,
-        price: Number(price) || 0,
-        cost: Number(cost) || 0,
-        stockQty: Number(stockQty) || 0,
-        lowStockThreshold: Number(lowStockThreshold) || 5,
-      },
-      include: {
-        category: true,
-      },
+    const existing = await prisma.product.findUnique({ where: { id: params.id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    if (existing.companyId !== session.user.companyId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const nextQty = Number(stockQty) || 0;
+    const delta = nextQty - existing.stockQty;
+
+    const product = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: { id: params.id },
+        data: {
+          name,
+          barcode,
+          categoryId,
+          price: Number(price) || 0,
+          cost: Number(cost) || 0,
+          lowStockThreshold: Number(lowStockThreshold) || 5,
+        },
+        include: {
+          category: true,
+        },
+      });
+
+      if (delta !== 0 && existing.companyId) {
+        const { shop } = await ensureCompanyLocations(tx, existing.companyId);
+        await changeLocationStock(tx, {
+          productId: existing.id,
+          storeId: shop.id,
+          delta,
+          movementType: "ADJUSTMENT",
+          movementQty: Math.abs(delta),
+          reason: "Product stock edit",
+          userId: session.user.id,
+        });
+      } else if (delta !== 0) {
+        await tx.product.update({
+          where: { id: existing.id },
+          data: { stockQty: nextQty },
+        });
+      }
+
+      return updated;
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json({ ...product, stockQty: nextQty });
   } catch (error: any) {
     console.error("Product PUT Error:", error);
     return NextResponse.json(

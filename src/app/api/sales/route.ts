@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { checkoutTotals } from "@/lib/checkout";
+import { changeLocationStock, ensureCompanyLocations, locationQty } from "@/lib/locations";
 
 // POST /api/sales - Create a new sale
 export async function POST(request: Request) {
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
         subtotal: number;
       }[] = [];
 
+      const locations = session.user.companyId
+        ? await ensureCompanyLocations(tx, session.user.companyId)
+        : null;
+
       // Sell at the catalog price and only from the cashier's company.
       for (const item of items) {
         const product = await tx.product.findFirst({
@@ -65,9 +70,12 @@ export async function POST(request: Request) {
           throw new Error(`Product not found: ${item.productId}`);
         }
 
-        if (product.stockQty < item.quantity) {
+        const available = locations
+          ? await locationQty(tx, product.id, locations.shop.id)
+          : product.stockQty;
+        if (available < item.quantity) {
           throw new Error(
-            `Insufficient stock for ${product.name}. Available: ${product.stockQty}`
+            `Insufficient shop stock for ${product.name}. On the shop floor: ${available}`
           );
         }
 
@@ -160,27 +168,33 @@ export async function POST(request: Request) {
 
       // Update stock and create stock movements
       for (const item of pricedItems) {
-        // Decrease stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stockQty: {
-              decrement: item.quantity,
-            },
-          },
-        });
-
-        // Create stock movement
-        await tx.stockMovement.create({
-          data: {
+        if (locations) {
+          await changeLocationStock(tx, {
             productId: item.productId,
-            type: "OUT",
-            qty: item.quantity,
+            storeId: locations.shop.id,
+            delta: -item.quantity,
+            movementType: "OUT",
+            movementQty: item.quantity,
             reason: "Sale",
             userId,
             reference: sale.id,
-          },
-        });
+          });
+        } else {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stockQty: { decrement: item.quantity } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: "OUT",
+              qty: item.quantity,
+              reason: "Sale",
+              userId,
+              reference: sale.id,
+            },
+          });
+        }
       }
 
       // Create receipt

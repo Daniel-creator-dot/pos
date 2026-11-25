@@ -59,11 +59,18 @@ export async function POST(request: Request) {
         address,
         status: "ACTIVE",
         stores: {
-          create: {
-            name: `${name} - Main Store`,
-            address: address,
-            phone: phone,
-          }
+          create: [
+            {
+              name: `${name} - Shop`,
+              address: address,
+              phone: phone,
+              kind: "STORE",
+            },
+            {
+              name: `${name} - Warehouse`,
+              kind: "WAREHOUSE",
+            },
+          ],
         }
       },
       include: {
