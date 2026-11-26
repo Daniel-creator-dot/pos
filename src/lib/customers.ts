@@ -133,3 +133,51 @@ export async function textCustomer(
   });
   return result;
 }
+
+export async function textBulk(
+  prisma: PrismaClient,
+  args: { companyId: string; phones: string[]; message: string }
+) {
+  const shop = await ensureShopSms(prisma, args.companyId);
+  if (!shop) {
+    return { sent: 0, failed: 0, total: 0, detail: "Shop location was not found", recipients: [] as { phone: string; success: boolean }[] };
+  }
+  const phones = Array.from(new Set(args.phones)).slice(0, 200);
+  const logs = [];
+  for (const phone of phones) {
+    logs.push(
+      await prisma.smsLog.create({
+        data: {
+          storeId: shop.id,
+          companyId: args.companyId,
+          recipient: phone,
+          message: args.message,
+          status: "pending",
+          type: "campaign",
+        },
+      })
+    );
+  }
+  const result = await sendIntekSms(
+    phones,
+    args.message,
+    shop.smsSenderId || process.env.INTEK_SMS_SENDER || "Swiftpos",
+    shop.smsApiKey || undefined
+  );
+  if (logs.length > 0) {
+    await prisma.smsLog.updateMany({
+      where: { id: { in: logs.map((log) => log.id) } },
+      data: {
+        status: result.success ? "sent" : "failed",
+        error: result.error || null,
+      },
+    });
+  }
+  return {
+    sent: result.success ? phones.length : 0,
+    failed: result.success ? 0 : phones.length,
+    total: phones.length,
+    detail: result.success ? "" : result.error || "The text could not be delivered",
+    recipients: phones.map((phone) => ({ phone, success: result.success })),
+  };
+}

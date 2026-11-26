@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { ensureCustomerColumns, normalizePhone, saveCustomer, textCustomer } from "@/lib/customers";
+import { ensureCustomerColumns, normalizePhone, saveCustomer, textBulk } from "@/lib/customers";
 
 function publicSmsFailure(error?: string) {
   if (error && error.includes("Sender ID")) {
@@ -57,43 +57,68 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     await ensureCustomerColumns(prisma);
 
-    if (body.mode === "broadcast") {
+    if (body.mode === "broadcast" || body.mode === "bulk") {
       const message = String(body.message || "").trim();
       if (message.length < 5) {
         return NextResponse.json({ error: "Write a short message first" }, { status: 400 });
       }
-      const store = await prisma.store.findFirst({
-        where: { companyId: session.user.companyId, kind: "STORE" },
-      });
-      if (!store) {
-        return NextResponse.json({ error: "Shop location was not found" }, { status: 400 });
-      }
-      const customers = await prisma.customer.findMany({
-        where: {
-          companyId: session.user.companyId,
-          marketingOptIn: true,
-          phone: { not: null },
-        },
-      });
-      let sent = 0;
-      let failed = 0;
-      let detail = "";
-      for (const customer of customers) {
-        if (!customer.phone) continue;
-        const result = await textCustomer(prisma, {
-          storeId: store.id,
-          companyId: session.user.companyId,
-          phone: customer.phone,
-          message,
-          type: "campaign",
+      const phones: string[] = [];
+      const skipped: string[] = [];
+      if (body.mode === "broadcast") {
+        const customers = await prisma.customer.findMany({
+          where: {
+            companyId: session.user.companyId,
+            marketingOptIn: true,
+            phone: { not: null },
+          },
         });
-        if (result.success) sent += 1;
-        else {
-          failed += 1;
-          if (!detail) detail = publicSmsFailure(result.error);
+        for (const customer of customers) {
+          if (customer.phone) phones.push(customer.phone);
+        }
+      } else {
+        const ids = Array.isArray(body.customerIds) ? body.customerIds.filter((id: unknown) => typeof id === "string") : [];
+        if (ids.length > 0) {
+          const selected = await prisma.customer.findMany({
+            where: { companyId: session.user.companyId, id: { in: ids }, phone: { not: null } },
+          });
+          for (const customer of selected) {
+            if (customer.phone) phones.push(customer.phone);
+          }
+        }
+        const extra = Array.isArray(body.phones)
+          ? body.phones
+          : String(body.phones || "").split(/[\s,;]+/);
+        for (const raw of extra) {
+          const typed = String(raw || "").trim();
+          if (!typed) continue;
+          const phone = normalizePhone(typed);
+          if (!phone) {
+            skipped.push(typed);
+            continue;
+          }
+          phones.push(phone);
+          await saveCustomer(prisma, {
+            companyId: session.user.companyId,
+            phone,
+            name: "Customer",
+            marketingOptIn: true,
+          });
         }
       }
-      return NextResponse.json({ sent, failed, total: customers.length, detail });
+      const unique = Array.from(new Set(phones));
+      if (unique.length === 0) {
+        return NextResponse.json({ error: "Choose at least one phone number" }, { status: 400 });
+      }
+      const result = await textBulk(prisma, {
+        companyId: session.user.companyId,
+        phones: unique,
+        message,
+      });
+      return NextResponse.json({
+        ...result,
+        detail: result.detail ? publicSmsFailure(result.detail) : "",
+        skipped,
+      });
     }
 
     const phone = normalizePhone(body.phone);

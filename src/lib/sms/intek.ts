@@ -10,23 +10,26 @@ interface SendSmsResponse {
  * @param message The SMS text content
  * @param senderName The approved sender name registered with Intek (defaults to "Swiftpos")
  */
+function formatRecipient(to: string) {
+  let formattedRecipient = to.replace(/[\s\-\(\)]/g, "");
+  if (formattedRecipient.startsWith("0") && formattedRecipient.length === 10) {
+    formattedRecipient = "233" + formattedRecipient.substring(1);
+  } else if (formattedRecipient.startsWith("+")) {
+    formattedRecipient = formattedRecipient.substring(1);
+  }
+  return formattedRecipient;
+}
+
 export async function sendIntekSms(
-  to: string,
+  to: string | string[],
   message: string,
   senderName: string = "Swiftpos",
   apiKeyOverride?: string | null
 ): Promise<SendSmsResponse> {
   const apiKey = apiKeyOverride || process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
-  
-  // Format the recipient phone number: ensure it does not contain spaces or hyphens
-  let formattedRecipient = to.replace(/[\s\-\(\)]/g, "");
-  
-  // Simple check: if phone number starts with '0' and is 10 digits (common for local Ghana numbers e.g. 024xxxxxxx),
-  // convert it to international format with country code 233 if no country code is supplied.
-  if (formattedRecipient.startsWith("0") && formattedRecipient.length === 10) {
-    formattedRecipient = "233" + formattedRecipient.substring(1);
-  } else if (formattedRecipient.startsWith("+")) {
-    formattedRecipient = formattedRecipient.substring(1);
+  const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map(formatRecipient).filter(Boolean)));
+  if (recipients.length === 0) {
+    return { success: false, error: "No phone numbers to text" };
   }
 
   try {
@@ -38,9 +41,9 @@ export async function sendIntekSms(
         "Accept": "application/json"
       },
       body: JSON.stringify({
-        recipients: [formattedRecipient],
+        recipients,
         message: message,
-        sender: senderName // Approved sender name registered with Intek
+        sender: senderName
       })
     });
 
