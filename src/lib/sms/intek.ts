@@ -58,8 +58,7 @@ export async function sendIntekSms(
   to: string | string[],
   message: string,
   senderName: string = "Swiftpos",
-  apiKeyOverride?: string | null,
-  allowFallback: boolean = true
+  apiKeyOverride?: string | null
 ): Promise<SendSmsResponse> {
   const apiKey = apiKeyOverride || process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
   const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map(formatRecipient).filter(Boolean)));
@@ -68,13 +67,7 @@ export async function sendIntekSms(
   }
 
   try {
-    const result = await postIntek(apiKey, recipients, message, senderName);
-    const fallback = process.env.INTEK_SMS_FALLBACK_SENDER || "Primecare";
-    const held = result.error?.includes("Sender ID") && result.error.includes("on hold");
-    if (allowFallback && held && senderName !== fallback) {
-      return postIntek(apiKey, recipients, message, fallback);
-    }
-    return result;
+    return await postIntek(apiKey, recipients, message, senderName);
   } catch (error: any) {
     console.error("[IntekSMS] Connection Error:", error);
     return { success: false, error: error.message || "SMS connection timeout or network failure" };

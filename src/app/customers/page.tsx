@@ -168,7 +168,7 @@ export default function CustomersPage() {
             <section id="bulk-sms" className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="font-semibold text-slate-950">Bulk SMS</h2>
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                Swiftpos is on hold at Intek, so these texts go out under the sender name Primecare until Swiftpos is released. Put the shop name in the message.
+                Texts use the sender name Swiftpos. Intek is holding that name, so a text will not go out until the website https://posbytz.onrender.com is added to Swiftpos in the Intek account.
               </p>
               <p className="text-xs text-slate-500">{selected.length} selected · {reachable} opted in for offers</p>
               <div className="flex gap-2">
