@@ -20,11 +20,46 @@ function formatRecipient(to: string) {
   return formattedRecipient;
 }
 
+async function postIntek(
+  apiKey: string,
+  recipients: string[],
+  message: string,
+  senderName: string
+): Promise<SendSmsResponse> {
+  const response = await fetch("https://www.inteksms.top/api/v1/messages/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      recipients,
+      message,
+      sender: senderName,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[IntekSMS] HTTP Error ${response.status}:`, errorText);
+    return { success: false, error: `Intek API status ${response.status}: ${errorText}` };
+  }
+
+  const data = await response.json();
+  console.log("[IntekSMS] API Response:", data);
+  if (data.ok === true || data.status === "success" || data.id || data.success || data.code === 200) {
+    return { success: true, messageId: String(data.data?.campaign_id || data.id || data.message_id || data.code || "") };
+  }
+  return { success: false, error: data.message || "Failed to deliver SMS via Intek" };
+}
+
 export async function sendIntekSms(
   to: string | string[],
   message: string,
   senderName: string = "Swiftpos",
-  apiKeyOverride?: string | null
+  apiKeyOverride?: string | null,
+  allowFallback: boolean = true
 ): Promise<SendSmsResponse> {
   const apiKey = apiKeyOverride || process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
   const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map(formatRecipient).filter(Boolean)));
@@ -33,35 +68,13 @@ export async function sendIntekSms(
   }
 
   try {
-    const response = await fetch("https://www.inteksms.top/api/v1/messages/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        recipients,
-        message: message,
-        sender: senderName
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[IntekSMS] HTTP Error ${response.status}:`, errorText);
-      return { success: false, error: `Intek API status ${response.status}: ${errorText}` };
+    const result = await postIntek(apiKey, recipients, message, senderName);
+    const fallback = process.env.INTEK_SMS_FALLBACK_SENDER || "Primecare";
+    const held = result.error?.includes("Sender ID") && result.error.includes("on hold");
+    if (allowFallback && held && senderName !== fallback) {
+      return postIntek(apiKey, recipients, message, fallback);
     }
-
-    const data = await response.json();
-    console.log("[IntekSMS] API Response:", data);
-
-    // According to Intek API, look for success response indicators
-    if (data.ok === true || data.status === "success" || data.id || data.success || data.code === 200) {
-      return { success: true, messageId: String(data.data?.campaign_id || data.id || data.message_id || data.code || "") };
-    }
-
-    return { success: false, error: data.message || "Failed to deliver SMS via Intek" };
+    return result;
   } catch (error: any) {
     console.error("[IntekSMS] Connection Error:", error);
     return { success: false, error: error.message || "SMS connection timeout or network failure" };

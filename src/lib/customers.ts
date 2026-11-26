@@ -6,7 +6,7 @@ import { sendIntekSms } from "./sms/intek";
 let ready: Promise<void> | null = null;
 
 export const SMS_SENDER_HOLD =
-  "Intek is holding the sender name Swiftpos. Log in at inteksms.top, open Sender IDs, add https://posbytz.onrender.com to Swiftpos, then send again.";
+  "Intek is holding Swiftpos, and the backup sender also failed. Log in at inteksms.top and add https://posbytz.onrender.com to the Swiftpos sender.";
 
 export function normalizePhone(raw: string | null | undefined) {
   const digits = String(raw || "").replace(/\D/g, "");

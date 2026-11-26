@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     // 6. Build and send SMS message via Intek SMS API
     const message = `SwiftPOS Security Alert: Your password reset verification code is ${otpCode}. It is valid for 10 minutes.`;
-    const smsResult = await sendIntekSms(recipientPhone, message, smsSenderName);
+    const smsResult = await sendIntekSms(recipientPhone, message, smsSenderName, undefined, false);
 
     // 6. Create SMS log in the database
     try {
