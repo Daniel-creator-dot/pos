@@ -258,7 +258,7 @@ export async function POST(request: Request) {
         : {
             status: "failed",
             detail: sent.error?.includes("Sender ID")
-              ? "The SMS sender name is on hold with the provider."
+              ? "Intek is holding the sender name Swiftpos. Add https://posbytz.onrender.com to that sender, then the receipt can be texted from Sales."
               : "The receipt text could not be delivered.",
           };
     }

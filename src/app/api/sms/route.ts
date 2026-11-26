@@ -190,7 +190,7 @@ export async function POST(request: Request) {
 
 function publicSmsError(error?: string) {
   if (error && error.includes("Sender ID")) {
-    return "Intek accepted the request, then held the sender name Swiftpos. Add the required URL on that sender ID in the Intek account, then send again.";
+    return "Intek is holding the sender name Swiftpos. Log in at inteksms.top, open Sender IDs, add https://posbytz.onrender.com to Swiftpos, then send again.";
   }
   return "The text could not be delivered.";
 }

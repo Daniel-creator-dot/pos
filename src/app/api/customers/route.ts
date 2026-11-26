@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { ensureCustomerColumns, normalizePhone, saveCustomer, textBulk } from "@/lib/customers";
+import { SMS_SENDER_HOLD, ensureCustomerColumns, normalizePhone, saveCustomer, textBulk } from "@/lib/customers";
 
 function publicSmsFailure(error?: string) {
   if (error && error.includes("Sender ID")) {
-    return "The SMS sender name is on hold with the provider. Numbers are still saved.";
+    return `${SMS_SENDER_HOLD} Numbers are still saved.`;
   }
   return "The text could not be delivered.";
 }
