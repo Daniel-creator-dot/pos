@@ -8,7 +8,7 @@ async function main() {
     data: {
       smsEnabled: true,
       smsProvider: "intek",
-      smsApiKey: "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562",
+      smsApiKey: "INTEK_274EC1.a16baf07f5a2aee65c81eb3db7e183eb669439071eaf3b0b",
       smsSenderId: "Swiftpos",
     }
   });
