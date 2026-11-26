@@ -1,5 +1,5 @@
 async function testPayload(name: string, payload: any) {
-  const apiKey = process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
+  const apiKey = process.env.INTEK_SMS_API_KEY || "INTEK_274EC1.a16baf07f5a2aee65c81eb3db7e183eb669439071eaf3b0b";
   console.log(`\nTesting payload [${name}]:`, JSON.stringify(payload));
   
   try {
