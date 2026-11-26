@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Search,
   ShoppingCart,
@@ -51,6 +51,7 @@ export default function POSPage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [category, setCategory] = useState("All");
   const [barcodeValue, setBarcodeValue] = useState("");
   const [discount, setDiscount] = useState(0);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -121,20 +122,25 @@ export default function POSPage() {
     }
   }, [isPaymentModalOpen, showReceipt]);
 
+  const categories = useMemo(() => {
+    const names = new Set(products.map((product) => product.category?.name).filter(Boolean) as string[]);
+    return ["All", ...Array.from(names)];
+  }, [products]);
+
   // Search products
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const filtered = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.barcode?.toLowerCase().includes(query)
-      );
-      setFilteredProducts(filtered);
-    } else {
-      setFilteredProducts(products);
-    }
-  }, [searchQuery, products]);
+    const query = searchQuery.trim().toLowerCase();
+    setFilteredProducts(
+      products.filter((product) => {
+        const matchesQuery =
+          !query ||
+          product.name.toLowerCase().includes(query) ||
+          product.barcode?.toLowerCase().includes(query);
+        const matchesCategory = category === "All" || product.category?.name === category;
+        return matchesQuery && matchesCategory;
+      })
+    );
+  }, [searchQuery, products, category]);
 
   // Handle barcode input
   const handleBarcodeSubmit = (e: React.FormEvent) => {
@@ -619,6 +625,24 @@ export default function POSPage() {
                  </span>
                </div>
             </div>
+            {categories.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-3">
+                {categories.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setCategory(name)}
+                    className={`shrink-0 h-9 px-3 rounded-full text-sm font-semibold border ${
+                      category === name
+                        ? "bg-slate-950 text-white border-slate-950"
+                        : "bg-white text-slate-700 border-slate-200"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <form onSubmit={handleBarcodeSubmit} className="flex-1">
                 <div className="relative">
@@ -654,30 +678,23 @@ export default function POSPage() {
                 <div
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className={`product-card ${
+                  className={`product-card rounded-2xl border-slate-200 ${
                     availableQty(product) <= 0 ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
-                  <div className="font-medium text-gray-900 truncate text-sm sm:text-base">
+                  <div className={`h-1.5 rounded-full mb-3 ${availableQty(product) <= 0 ? "bg-rose-400" : availableQty(product) <= product.lowStockThreshold ? "bg-amber-400" : "bg-emerald-500"}`} />
+                  <div className="font-semibold text-slate-950 truncate text-sm sm:text-base">
                     {product.name}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                    {product.category?.name}
+                  <div className="text-xs text-slate-500 mt-1">{product.category?.name || "Uncategorized"}</div>
+                  <div className="mt-3 text-lg font-bold text-slate-950">
+                    {formatCurrency(product.price, currency)}
                   </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="font-bold text-primary-600 text-sm sm:text-base">
-                      {formatCurrency(product.price, currency)}
+                  <div className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-wide">
+                    <span className={availableQty(product) <= product.lowStockThreshold ? "text-rose-600" : "text-slate-500"}>
+                      Shop {availableQty(product)}
                     </span>
-                    <span
-                      className={`text-xs ${
-                        availableQty(product) <= product.lowStockThreshold
-                          ? "text-red-600"
-                          : "text-gray-500"
-                      }`}
-                    >
-                      Shop: {availableQty(product)}
-                      {(product.warehouseQty ?? 0) > 0 ? ` · Warehouse: ${product.warehouseQty}` : ""}
-                    </span>
+                    <span className="text-slate-400">Wh {product.warehouseQty ?? 0}</span>
                   </div>
                 </div>
               ))}

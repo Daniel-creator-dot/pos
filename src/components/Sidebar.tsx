@@ -91,14 +91,14 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile header */}
-      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden bg-slate-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Package className="w-6 h-6 text-primary-600" />
-          <span className="font-bold text-gray-900">SwiftPOS</span>
+          <Package className="w-6 h-6 text-white" />
+          <span className="font-bold text-white">SwiftPOS</span>
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 text-gray-600 hover:text-gray-900"
+          className="p-2 text-slate-200 hover:text-white"
         >
           {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -107,18 +107,20 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
       <div className="flex">
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-950 text-white transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <Package className="w-8 h-8 text-primary-600" />
+            <div className="px-6 py-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
                 <div>
-                  <h1 className="font-bold text-gray-900">SwiftPOS</h1>
-                  <p className="text-xs text-gray-500 capitalize">{userRole || "Guest"}</p>
+                  <h1 className="font-bold text-white tracking-tight">SwiftPOS</h1>
+                  <p className="text-xs text-slate-400 capitalize">{userRole || "Guest"}</p>
                 </div>
               </div>
             </div>
@@ -133,10 +135,10 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                       <Link
                         href={item.href}
                         onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                           isActive
-                            ? "bg-primary-50 text-primary-700"
-                            : "text-gray-700 hover:bg-gray-100"
+                            ? "bg-white text-slate-950"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -154,23 +156,23 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             </nav>
 
             {/* User section */}
-            <div className="border-t border-gray-200 p-4">
+            <div className="border-t border-white/10 p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary-600" />
+                <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-white truncate">
                     {session?.user?.name || "User"}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-slate-400 truncate">
                     {session?.user?.email || ""}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-200 hover:bg-white/10 rounded-xl transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out

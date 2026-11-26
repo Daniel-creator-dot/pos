@@ -252,12 +252,13 @@ export default function ProductsPage() {
         <ToastContainer toasts={toasts} onRemove={removeToast} />
 
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-5">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Manage your product inventory
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Catalog</p>
+              <h1 className="text-2xl font-bold text-slate-950">Products</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Price, shop floor, and warehouse on every card
               </p>
             </div>
             {canEdit && (
@@ -351,20 +352,16 @@ export default function ProductsPage() {
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-lg font-bold text-primary-600">
+                  <div className="mt-4">
+                    <div className="text-2xl font-bold text-slate-950">
                       {formatCurrency(product.price, currency)}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        product.stockQty <= product.lowStockThreshold
-                          ? "bg-red-100 text-red-700 font-medium"
-                          : "bg-green-100 text-green-700 font-medium"
-                      }`}
-                    >
-                      Shop: {product.shopQty ?? product.stockQty}
-                      {(product.warehouseQty ?? 0) > 0 ? ` · Warehouse: ${product.warehouseQty}` : ""}
-                    </span>
+                    </div>
+                    <StockMeter
+                      label="Shop"
+                      qty={product.shopQty ?? product.stockQty}
+                      low={(product.shopQty ?? product.stockQty) <= product.lowStockThreshold}
+                    />
+                    <StockMeter label="Warehouse" qty={product.warehouseQty ?? 0} />
                   </div>
 
                   <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-400 flex flex-col gap-1">
@@ -582,5 +579,23 @@ export default function ProductsPage() {
         />
       </div>
     </AuthenticatedLayout>
+  );
+}
+
+function StockMeter({ label, qty, low = false }: { label: string; qty: number; low?: boolean }) {
+  const width = Math.min(100, qty * 8);
+  return (
+    <div className="mt-2">
+      <div className="flex justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <span>{label}</span>
+        <span className={low ? "text-rose-600" : "text-slate-700"}>{qty}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-slate-100 mt-1 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${low ? "bg-rose-500" : label === "Warehouse" ? "bg-amber-400" : "bg-emerald-500"}`}
+          style={{ width: `${Math.max(qty > 0 ? 8 : 0, width)}%` }}
+        />
+      </div>
+    </div>
   );
 }

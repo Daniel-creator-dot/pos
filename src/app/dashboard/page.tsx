@@ -2,13 +2,15 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   DollarSign,
   AlertTriangle,
   TrendingUp,
   Package,
   ShoppingCart,
-  Users,
+  ArrowRight,
+  Database,
 } from "lucide-react";
 import { format } from "date-fns";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
@@ -65,204 +67,136 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <AuthenticatedLayout>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-gray-500">Loading...</div>
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+          <div className="text-slate-500">Loading the shop...</div>
         </div>
       </AuthenticatedLayout>
     );
   }
 
+  const top = stats?.topProducts ?? [];
+  const maxSold = Math.max(1, ...top.map((product) => product.totalSold));
+  const cards = [
+    {
+      label: "Today's sales",
+      value: formatCurrency(stats?.todaySales ?? 0, currency),
+      icon: DollarSign,
+      tone: "bg-emerald-500",
+    },
+    {
+      label: "Today's profit",
+      value: formatCurrency(stats?.todayProfit ?? 0, currency),
+      icon: TrendingUp,
+      tone: "bg-sky-500",
+    },
+    {
+      label: "Orders",
+      value: String(stats?.todayOrders ?? 0),
+      icon: ShoppingCart,
+      tone: "bg-indigo-500",
+    },
+    {
+      label: "Low on the shop floor",
+      value: String(stats?.lowStockItems ?? 0),
+      icon: AlertTriangle,
+      tone: "bg-rose-500",
+    },
+  ];
+
   return (
     <AuthenticatedLayout>
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Welcome back, {session?.user?.name}
-            </p>
-          </div>
-          <div className="text-sm text-gray-500">
-            {format(new Date(), "EEEE, MMMM d, yyyy")}
-          </div>
-        </div>
-      </header>
-
-      <main className="p-6 max-w-7xl mx-auto">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Today's Sales */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Today's Sales
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(stats?.todaySales ?? 0, currency)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
+      <div className="min-h-screen bg-slate-100">
+        <header className="bg-slate-950 text-white px-4 sm:px-6 py-6">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shop floor</p>
+              <h1 className="text-3xl font-bold tracking-tight mt-1">
+                {session?.user?.name || "Dashboard"}
+              </h1>
+              <p className="text-sm text-slate-300 mt-1">
+                {format(new Date(), "EEEE, MMMM d")} · {stats?.totalProducts ?? 0} products
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/pos" className="inline-flex items-center gap-2 bg-white text-slate-950 rounded-xl px-4 h-11 font-semibold">
+                Open register <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link href="/stock" className="inline-flex items-center gap-2 bg-white/10 text-white rounded-xl px-4 h-11 font-semibold">
+                <Database className="w-4 h-4" /> Stock
+              </Link>
+              <Link href="/products" className="inline-flex items-center gap-2 bg-white/10 text-white rounded-xl px-4 h-11 font-semibold">
+                <Package className="w-4 h-4" /> Products
+              </Link>
             </div>
           </div>
+        </header>
 
-          {/* Today's profit, after discount and before tax */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Today&apos;s Profit
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(stats?.todayProfit ?? 0, currency)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-emerald-600" />
-              </div>
-            </div>
-          </div>
+        <main className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {cards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <article key={card.label} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                  <div className={`w-10 h-10 rounded-xl ${card.tone} text-white flex items-center justify-center mb-3`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-950 mt-1">{card.value}</p>
+                </article>
+              );
+            })}
+          </section>
 
-          {/* Today's Orders */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Today's Orders
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats?.todayOrders ?? 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Low Stock Items */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Low Stock Alert
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats?.lowStockItems ?? 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Total Products */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Total Products
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats?.totalProducts ?? 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Products */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Top Products
-              </h2>
-            </div>
-            <div className="card-content">
-              {stats?.topProducts && stats.topProducts.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.topProducts.map((product, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
-                          {index + 1}
-                        </span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {product.name}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-medium text-gray-900">
-                          {product.totalSold} sold
-                        </span>
-                        <span className="text-xs text-gray-500 ml-2">
-                          {formatCurrency(product.revenue, currency)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-950">What is selling</h2>
+              <p className="text-sm text-slate-500 mb-4">Units sold, longest bar is the leader</p>
+              {top.length === 0 ? (
+                <p className="text-slate-500 py-10 text-center">No sales yet. The register will fill this chart.</p>
               ) : (
-                <p className="text-gray-500 text-sm text-center py-8">
-                  No sales data available
-                </p>
+                <ul className="space-y-4">
+                  {top.map((product) => (
+                    <li key={product.name}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-semibold text-slate-900">{product.name}</span>
+                        <span className="text-slate-500">
+                          {product.totalSold} · {formatCurrency(product.revenue, currency)}
+                        </span>
+                      </div>
+                      <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary-600 to-sky-400"
+                          style={{ width: `${Math.max(8, (product.totalSold / maxSold) * 100)}%` }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-          </div>
 
-          {/* Recent Sales */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Recent Sales
-              </h2>
-            </div>
-            <div className="card-content">
-              {stats?.recentSales && stats.recentSales.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.recentSales.map((sale) => (
-                    <div
-                      key={sale.id}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                    >
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-950">Latest tickets</h2>
+              <p className="text-sm text-slate-500 mb-4">Newest sale at the top</p>
+              {(stats?.recentSales ?? []).length === 0 ? (
+                <p className="text-slate-500 py-10 text-center">No tickets today.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {stats?.recentSales.map((sale) => (
+                    <li key={sale.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3">
                       <div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {sale.user?.name ?? "Unknown"}
-                        </span>
-                        <p className="text-xs text-gray-500">
-                          {format(new Date(sale.createdAt), "MMM d, h:mm a")}
-                        </p>
+                        <p className="font-semibold text-slate-900">{sale.user?.name ?? "Register"}</p>
+                        <p className="text-xs text-slate-500">{format(new Date(sale.createdAt), "h:mm a")}</p>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatCurrency(sale.total, currency)}
-                      </span>
-                    </div>
+                      <p className="font-bold text-slate-950">{formatCurrency(sale.total, currency)}</p>
+                    </li>
                   ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm text-center py-8">
-                  No recent sales
-                </p>
+                </ul>
               )}
             </div>
-          </div>
-        </div>
-      </main>
-    </div>
+          </section>
+        </main>
+      </div>
     </AuthenticatedLayout>
   );
 }

@@ -90,6 +90,19 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              ["Register", "Scan, pay, print"],
+              ["Shop", "What you can sell"],
+              ["Warehouse", "What just arrived"],
+            ].map(([title, detail]) => (
+              <div key={title} className="rounded-2xl bg-white/10 border border-white/15 p-3">
+                <div className="text-sm font-bold">{title}</div>
+                <div className="text-xs text-primary-100 mt-1">{detail}</div>
+              </div>
+            ))}
+          </div>
+
           {/* POS Image Showcase Container */}
           <div className="relative group flex-grow flex items-center justify-center my-6">
             {/* Ambient glow behind image */}
