@@ -17,6 +17,7 @@ import {
   Database,
   Tag,
   CheckSquare,
+  Smartphone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { name: "Purchases", href: "/purchases", icon: Truck, roles: ["admin", "superadmin", "manager", "storekeeper"] },
   { name: "Suppliers", href: "/suppliers", icon: Users, roles: ["admin", "superadmin", "manager", "storekeeper"] },
   { name: "Sales", href: "/sales", icon: FileText, roles: ["admin", "superadmin", "manager", "cashier"] },
+  { name: "Customers", href: "/customers", icon: Smartphone, roles: ["admin", "superadmin", "manager"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "superadmin", "manager"] },
   { name: "Approvals", href: "/approvals", icon: CheckSquare, roles: ["admin", "superadmin"] },
   { name: "Users", href: "/users", icon: Users, roles: ["admin", "superadmin"] },

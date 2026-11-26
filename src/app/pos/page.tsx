@@ -67,6 +67,9 @@ export default function POSPage() {
   const [currency, setCurrency] = useState("USD");
   const [taxRate, setTaxRate] = useState(0);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [textOffers, setTextOffers] = useState(true);
 
   // Monitor online status
   useEffect(() => {
@@ -238,6 +241,9 @@ export default function POSPage() {
       payments,
       storeId: session?.user?.storeId,
       userId: session?.user?.id,
+      customerName,
+      customerPhone,
+      textOffers,
       createdAt: new Date().toISOString(),
     };
 
@@ -257,6 +263,8 @@ export default function POSPage() {
         setCart([]);
         setPayments([]);
         setDiscount(0);
+        setCustomerName("");
+        setCustomerPhone("");
       } else {
         alert(`Failed to complete transaction: ${result.error || "Server error"}`);
       }
@@ -301,6 +309,14 @@ export default function POSPage() {
                 <p className="text-gray-500 mt-1">
                   Receipt: {lastSale.receiptNumber}
                 </p>
+                {lastSale.receiptSms?.status === "sent" && (
+                  <p className="text-sm text-green-700 mt-2">Receipt texted to the customer.</p>
+                )}
+                {lastSale.receiptSms?.status === "failed" && (
+                  <p className="text-sm text-amber-700 mt-2">
+                    Number saved. The receipt text did not go through.
+                  </p>
+                )}
               </div>
 
               <div className="receipt-print bg-gray-50 p-4 rounded-lg mb-6 font-mono text-sm">
@@ -424,6 +440,32 @@ export default function POSPage() {
                     {formatCurrency(total, currency)}
                   </p>
                 </div>
+              </div>
+
+              <div className="mb-6 space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Customer number
+                </label>
+                <input
+                  className="input w-full"
+                  placeholder="Name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+                <input
+                  className="input w-full"
+                  placeholder="Phone for the receipt"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                />
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={textOffers}
+                    onChange={(e) => setTextOffers(e.target.checked)}
+                  />
+                  Text new arrivals and promotions
+                </label>
               </div>
 
               {addingPaymentMethod ? (

@@ -287,11 +287,13 @@ model Sale {
   subtotal   Float
   tax        Float    @default(0)
   receiptNumber String?
+  customerId String?
   createdAt  DateTime @default(now())
 
   user      User       @relation(fields: [userId], references: [id])
   store     Store      @relation(fields: [storeId], references: [id])
   company   Company?   @relation(fields: [companyId], references: [id])
+  customer  Customer?  @relation(fields: [customerId], references: [id])
   saleItems SaleItem[]
   payments  Payment[]
   receipt   Receipt?
@@ -299,6 +301,7 @@ model Sale {
   @@index([userId])
   @@index([storeId])
   @@index([companyId])
+  @@index([customerId])
   @@index([createdAt])
   @@index([receiptNumber])
 }
@@ -333,15 +336,17 @@ model Payment {
 }
 
 model Customer {
-  id        String   @id @default(uuid())
-  name      String
-  phone     String?
-  email     String?
-  companyId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  name           String
+  phone          String?
+  email          String?
+  companyId      String?
+  marketingOptIn Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  company   Company? @relation(fields: [companyId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  sales   Sale[]
 
   @@index([phone])
   @@index([email])

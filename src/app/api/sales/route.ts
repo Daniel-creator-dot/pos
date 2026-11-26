@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { checkoutTotals } from "@/lib/checkout";
+import { ensureCustomerColumns, normalizePhone, receiptText, saveCustomer, textCustomer } from "@/lib/customers";
 import { changeLocationStock, ensureCompanyLocations, locationQty } from "@/lib/locations";
 
 // POST /api/sales - Create a new sale
@@ -16,6 +17,16 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { items, discount, payments, storeId, userId } = body;
+    const typedPhone = String(body.customerPhone || "").trim();
+    const customerPhone = normalizePhone(typedPhone);
+    if (typedPhone && !customerPhone) {
+      return NextResponse.json(
+        { error: "Enter a valid customer phone number" },
+        { status: 400 }
+      );
+    }
+    const customerName = String(body.customerName || "").trim();
+    const textOffers = body.textOffers !== false;
 
     if (!items || items.length === 0) {
       return NextResponse.json(
@@ -40,6 +51,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    await ensureCustomerColumns(prisma);
 
     // Start a transaction to ensure data consistency
     const result = await prisma.$transaction(async (tx) => {
@@ -129,12 +142,23 @@ export async function POST(request: Request) {
         }) + 1
       ).padStart(4, "0")}`;
 
+      const customer =
+        customerPhone && session.user.companyId
+          ? await saveCustomer(tx, {
+              companyId: session.user.companyId,
+              phone: customerPhone,
+              name: customerName,
+              marketingOptIn: textOffers,
+            })
+          : null;
+
       // Create the sale
       const sale = await tx.sale.create({
         data: {
           userId,
           storeId: resolvedStoreId,
           companyId: session.user.companyId,
+          customerId: customer?.id,
           subtotal,
           discount: totals.discountPercent,
           tax: totals.tax,
@@ -206,10 +230,40 @@ export async function POST(request: Request) {
         },
       });
 
-      return sale;
+      return { sale, pricedItems };
     });
 
-    return NextResponse.json(result);
+    let receiptSms: { status: "sent" | "failed" | "skipped"; detail?: string } = {
+      status: "skipped",
+    };
+    if (customerPhone && session.user.companyId) {
+      const message = receiptText({
+        receiptNumber: result.sale.receiptNumber || result.sale.id,
+        items: result.pricedItems.map((item) => {
+          const product = result.sale.saleItems.find((row) => row.productId === item.productId);
+          return { name: product?.product.name || "Item", qty: item.quantity };
+        }),
+        total: result.sale.total,
+      });
+      const sent = await textCustomer(prisma, {
+        storeId: result.sale.storeId,
+        companyId: session.user.companyId,
+        phone: customerPhone,
+        message,
+        type: "receipt",
+        reference: result.sale.id,
+      });
+      receiptSms = sent.success
+        ? { status: "sent" }
+        : {
+            status: "failed",
+            detail: sent.error?.includes("Sender ID")
+              ? "The SMS sender name is on hold with the provider."
+              : "The receipt text could not be delivered.",
+          };
+    }
+
+    return NextResponse.json({ ...result.sale, receiptSms });
   } catch (error: any) {
     console.error("Sales API Error:", error);
     return NextResponse.json(
@@ -277,6 +331,9 @@ export async function GET(request: Request) {
           },
         },
         payments: true,
+        customer: {
+          select: { id: true, name: true, phone: true },
+        },
       },
       orderBy: {
         createdAt: "desc",

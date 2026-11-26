@@ -39,6 +39,7 @@ export default withAuth(
       "/purchases": "purchases",
       "/suppliers": "purchases",
       "/sales": "sales_history",
+      "/customers": "customers",
       "/reports": "reports",
       "/users": "users",
       "/settings": "settings",
@@ -63,6 +64,9 @@ export default withAuth(
           return NextResponse.next();
         }
         if (pathname.startsWith("/suppliers") && role === "storekeeper") {
+          return NextResponse.next();
+        }
+        if (pathname.startsWith("/customers") && role === "manager") {
           return NextResponse.next();
         }
         

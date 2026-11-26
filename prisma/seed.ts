@@ -37,7 +37,7 @@ async function main() {
     data: {
       name: RoleName.manager,
       description: "Store management access",
-      permissions: JSON.stringify(["dashboard", "pos", "products", "stock", "purchases", "reports", "sales_history"]),
+      permissions: JSON.stringify(["dashboard", "pos", "products", "stock", "purchases", "reports", "sales_history", "customers"]),
     },
   });
 
