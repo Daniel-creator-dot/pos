@@ -64,7 +64,7 @@ export default function POSPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
   const [taxRate, setTaxRate] = useState(0);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [customerName, setCustomerName] = useState("");
@@ -95,7 +95,7 @@ export default function POSPage() {
 
         if (settingsRes?.ok) {
           const data = await settingsRes.json();
-          setCurrency(data.currency || "USD");
+          setCurrency(data.currency || "GHS");
           setTaxRate(Number(data.taxRate) || 0);
         }
 
@@ -265,6 +265,11 @@ export default function POSPage() {
         setDiscount(0);
         setCustomerName("");
         setCustomerPhone("");
+        const productsRes = await fetch("/api/products");
+        if (productsRes.ok) {
+          const data = await productsRes.json();
+          setProducts(data.filter((product: { isPendingDelete?: boolean }) => !product.isPendingDelete));
+        }
       } else {
         alert(`Failed to complete transaction: ${result.error || "Server error"}`);
       }

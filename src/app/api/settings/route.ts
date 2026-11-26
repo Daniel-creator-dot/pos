@@ -43,7 +43,7 @@ export async function GET() {
       phone: "",
       email: "",
       taxRate: 0,
-      currency: "USD",
+      currency: "GHS",
       lowStockThreshold: 5,
       smsEnabled: true,
       smsProvider: "intek",

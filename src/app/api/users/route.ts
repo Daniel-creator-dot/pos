@@ -21,6 +21,7 @@ export async function GET() {
       where: {
         ...(session.user.role.name !== "superadmin" ? { companyId: session.user.companyId } : {}),
       },
+      omit: { passwordHash: true },
       include: {
         role: {
           select: {
@@ -119,7 +120,8 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return NextResponse.json(safeUser, { status: 201 });
   } catch (error) {
     console.error("Users API Error:", error);
     return NextResponse.json(

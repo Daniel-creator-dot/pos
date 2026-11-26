@@ -228,26 +228,12 @@ async function sendSMS(store: any, recipient: string, message: string) {
 }
 
 // Helper functions for different SMS providers
-async function sendViaTwilio(store: any, recipient: string, message: string) {
-  console.log(`[Twilio] Sending SMS to ${recipient}: ${message}`);
-  
-  if (!store.smsApiKey || !store.smsApiSecret) {
-    return { success: false, error: "Twilio credentials not configured" };
-  }
-
-  // Simulate API call - in production, use Twilio SDK
-  return { success: true };
+async function sendViaTwilio(_store: any, _recipient: string, _message: string) {
+  return { success: false, error: "Twilio is not connected. Use Intek SMS." };
 }
 
-async function sendViaAfricasTalking(store: any, recipient: string, message: string) {
-  console.log(`[Africa's Talking] Sending SMS to ${recipient}: ${message}`);
-  
-  if (!store.smsApiKey) {
-    return { success: false, error: "Africa's Talking credentials not configured" };
-  }
-
-  // Simulate API call - in production, use Africa's Talking API
-  return { success: true };
+async function sendViaAfricasTalking(_store: any, _recipient: string, _message: string) {
+  return { success: false, error: "Africa's Talking is not connected. Use Intek SMS." };
 }
 
 async function sendViaGeneric(store: any, recipient: string, message: string) {

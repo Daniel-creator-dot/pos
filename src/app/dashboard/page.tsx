@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -47,7 +47,7 @@ export default function DashboardPage() {
 
         if (settingsRes.ok) {
           const data = await settingsRes.json();
-          setCurrency(data.currency || "USD");
+          setCurrency(data.currency || "GHS");
         }
 
         if (dashboardRes.ok) {

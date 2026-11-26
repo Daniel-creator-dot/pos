@@ -36,6 +36,8 @@ interface Sale {
     amount: number;
     reference?: string;
   }[];
+  tax?: number;
+  customer?: { id: string; name: string; phone: string | null } | null;
 }
 
 export default function SalesHistoryPage() {
@@ -46,7 +48,8 @@ export default function SalesHistoryPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
+  const [receiptNotice, setReceiptNotice] = useState("");
 
   useEffect(() => {
     fetchSettings();
@@ -58,7 +61,7 @@ export default function SalesHistoryPage() {
       const response = await fetch("/api/settings");
       if (response.ok) {
         const data = await response.json();
-        setCurrency(data.currency || "USD");
+        setCurrency(data.currency || "GHS");
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
@@ -86,9 +89,34 @@ export default function SalesHistoryPage() {
     }
   };
 
-  const filteredSales = sales.filter((sale) =>
-    sale.receiptNumber?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSales = sales.filter((sale) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const digits = query.replace(/\D/g, "");
+    return (
+      sale.receiptNumber?.toLowerCase().includes(query) ||
+      sale.customer?.name?.toLowerCase().includes(query) ||
+      sale.customer?.phone?.toLowerCase().includes(query) ||
+      (digits.length >= 4 && sale.customer?.phone?.includes(digits))
+    );
+  });
+
+  const textReceipt = async (sale: Sale) => {
+    if (!sale.customer?.phone) return;
+    setReceiptNotice("");
+    const lines = sale.saleItems.map((item) => `${item.product.name} x${item.qty}`).join(", ");
+    const response = await fetch("/api/sms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: sale.customer.phone,
+        type: "receipt",
+        message: `SwiftPOS ${sale.receiptNumber}. ${lines}. Total ${sale.total.toFixed(2)}. Thank you.`,
+      }),
+    });
+    const result = await response.json();
+    setReceiptNotice(response.ok ? "Receipt text sent." : result.error || "The receipt text did not go through.");
+  };
 
   const totalSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
 
@@ -126,6 +154,17 @@ export default function SalesHistoryPage() {
                   </p>
                 </div>
               </div>
+              {selectedSale.customer?.phone && (
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p className="text-sm text-gray-700">
+                    {selectedSale.customer.name} · {selectedSale.customer.phone}
+                  </p>
+                  <button onClick={() => textReceipt(selectedSale)} className="btn btn-secondary">
+                    Text receipt
+                  </button>
+                </div>
+              )}
+              {receiptNotice && <p className="text-sm mt-2 text-slate-700">{receiptNotice}</p>}
             </div>
 
             <div className="card-content">
@@ -278,12 +317,12 @@ export default function SalesHistoryPage() {
 
   return (
     <AuthenticatedLayout>
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100">
+      <header className="bg-slate-950 text-white px-6 py-5">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sales History</h1>
-            <p className="text-sm text-gray-500 mt-1">View and manage all sales transactions</p>
+            <h1 className="text-2xl font-bold">Sales</h1>
+            <p className="text-sm text-slate-300 mt-1">Receipts, customer numbers, and what was paid</p>
           </div>
           <a href="/pos" className="btn btn-primary flex items-center gap-2">
             <Package className="w-4 h-4" />
@@ -297,14 +336,14 @@ export default function SalesHistoryPage() {
           <div className="card-content">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="label block mb-1 text-xs">Receipt Number</label>
+                <label className="label block mb-1 text-xs">Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search receipt number..."
+                    placeholder="Receipt, name, or phone"
                     className="input pl-9"
                   />
                 </div>
@@ -374,6 +413,7 @@ export default function SalesHistoryPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt #</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cashier</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -391,6 +431,16 @@ export default function SalesHistoryPage() {
                           {format(new Date(sale.createdAt), "MMM d, yyyy h:mm a")}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{sale.user?.name || "Unknown"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {sale.customer?.phone ? (
+                            <span>
+                              {sale.customer.name}
+                              <span className="block text-xs text-gray-500">{sale.customer.phone}</span>
+                            </span>
+                          ) : (
+                            "Walk-in"
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{sale.saleItems.length}</td>
                         <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">{formatCurrency(sale.total, currency)}</td>
                         <td className="px-4 py-3 text-right">

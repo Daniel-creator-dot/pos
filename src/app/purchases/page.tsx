@@ -40,7 +40,7 @@ export default function PurchasesPage() {
     items: [{ productId: "", qty: 1, unitCost: 0 }],
     notes: "",
   });
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
 
   const isAdmin = session?.user?.role?.name === "admin";
   const isManager = session?.user?.role?.name === "manager";
@@ -59,7 +59,7 @@ export default function PurchasesPage() {
       const response = await fetch("/api/settings");
       if (response.ok) {
         const data = await response.json();
-        setCurrency(data.currency || "USD");
+        setCurrency(data.currency || "GHS");
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
@@ -217,6 +217,7 @@ export default function PurchasesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Purchases</h1>
+            <p className="text-sm text-gray-500 mt-1">Received goods go into the warehouse. Move them to the shop from Stock.</p>
             <p className="text-sm text-gray-500 mt-1">Manage supplier purchases</p>
           </div>
           {canCreate && (

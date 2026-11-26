@@ -94,7 +94,8 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(user);
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return NextResponse.json(safeUser);
   } catch (error) {
     console.error("Users API Error:", error);
     return NextResponse.json(
@@ -187,7 +188,8 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(user);
+    const { passwordHash: _hidden, ...safeUser } = user;
+    return NextResponse.json(safeUser);
   } catch (error) {
     console.error("Users API Error:", error);
     return NextResponse.json(

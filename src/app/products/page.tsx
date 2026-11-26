@@ -67,7 +67,7 @@ export default function ProductsPage() {
     stockQty: 0,
     lowStockThreshold: 5,
   });
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
 
   // Delete confirmation state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -88,7 +88,7 @@ export default function ProductsPage() {
       const response = await fetch("/api/settings");
       if (response.ok) {
         const data = await response.json();
-        setCurrency(data.currency || "USD");
+        setCurrency(data.currency || "GHS");
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);

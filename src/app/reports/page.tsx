@@ -24,7 +24,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GHS");
 
   useEffect(() => {
     fetchSettings();
@@ -36,7 +36,7 @@ export default function ReportsPage() {
       const response = await fetch("/api/settings");
       if (response.ok) {
         const data = await response.json();
-        setCurrency(data.currency || "USD");
+        setCurrency(data.currency || "GHS");
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
@@ -117,12 +117,12 @@ export default function ReportsPage() {
 
   return (
     <AuthenticatedLayout>
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-slate-100">
+      <div className="bg-slate-950 text-white px-6 py-5">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-            <p className="text-sm text-gray-500 mt-1">View sales and inventory analytics</p>
+            <h1 className="text-2xl font-bold">Reports</h1>
+            <p className="text-sm text-slate-300 mt-1">Sales, profit, and what is left to sell</p>
           </div>
           <button
             onClick={exportToExcel}
@@ -133,6 +133,8 @@ export default function ReportsPage() {
             Export to Excel
           </button>
         </div>
+      </div>
+      <div className="p-6 max-w-7xl mx-auto">
 
         <div className="card mb-6">
           <div className="card-content">

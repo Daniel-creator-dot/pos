@@ -30,7 +30,7 @@ export default function SettingsPage() {
     phone: "",
     email: "",
     taxRate: 0,
-    currency: "USD",
+    currency: "GHS",
     lowStockThreshold: 5,
     smsEnabled: true,
     smsProvider: "intek",
@@ -203,10 +203,10 @@ export default function SettingsPage() {
                     onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
                     className="input"
                   >
+                    <option value="GHS">GHS (₵)</option>
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
                     <option value="GBP">GBP (£)</option>
-                    <option value="GHS">GHS (₵)</option>
                   </select>
                 </div>
                 <div>
