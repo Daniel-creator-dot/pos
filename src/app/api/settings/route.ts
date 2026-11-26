@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { ensureShopSms } from "@/lib/customers";
 
 interface StoreSettings {
   name: string;
@@ -10,6 +11,12 @@ interface StoreSettings {
   taxRate: number;
   currency: string;
   lowStockThreshold: number;
+  smsEnabled: boolean;
+  smsProvider: string;
+  smsApiKey: string;
+  smsApiSecret: string;
+  smsSenderId: string;
+  smsEndpoint: string;
 }
 
 // GET /api/settings - Get store settings
@@ -38,6 +45,12 @@ export async function GET() {
       taxRate: 0,
       currency: "USD",
       lowStockThreshold: 5,
+      smsEnabled: true,
+      smsProvider: "intek",
+      smsApiKey: "",
+      smsApiSecret: "",
+      smsSenderId: "Swiftpos",
+      smsEndpoint: "",
     };
 
     if (!store) {
@@ -54,10 +67,23 @@ export async function GET() {
       }
     }
 
-    // Override with store data
+    if (session.user.companyId) {
+      await ensureShopSms(prisma, session.user.companyId);
+    }
+    const smsStore = session.user.companyId
+      ? await prisma.store.findFirst({ where: { companyId: session.user.companyId, kind: "STORE" } })
+      : store;
+
+    // Override with store data. The API key stays on the server.
     settings.name = store.name;
     settings.address = store.address || "";
     settings.phone = store.phone || "";
+    settings.smsEnabled = smsStore?.smsEnabled ?? false;
+    settings.smsProvider = smsStore?.smsProvider || "intek";
+    settings.smsSenderId = smsStore?.smsSenderId || "Swiftpos";
+    settings.smsEndpoint = smsStore?.smsEndpoint || "";
+    settings.smsApiKey = "";
+    settings.smsApiSecret = "";
 
     return NextResponse.json(settings);
   } catch (error) {
@@ -83,6 +109,7 @@ export async function PUT(request: Request) {
     }
 
     const body: StoreSettings = await request.json();
+    const { smsApiKey, smsApiSecret, ...settingsWithoutSecrets } = body;
 
     const { prisma } = await import("@/lib/prisma");
 
@@ -94,8 +121,19 @@ export async function PUT(request: Request) {
       }
     });
 
-    // Save settings as JSON string
-    const settingsJson = JSON.stringify(body);
+    const settingsJson = JSON.stringify({
+      ...settingsWithoutSecrets,
+      smsApiKey: "",
+      smsApiSecret: "",
+    });
+    const smsData = {
+      smsEnabled: Boolean(body.smsEnabled),
+      smsProvider: body.smsProvider || "intek",
+      smsSenderId: body.smsSenderId || "Swiftpos",
+      smsEndpoint: body.smsEndpoint || null,
+      ...(smsApiKey ? { smsApiKey } : {}),
+      ...(smsApiSecret ? { smsApiSecret } : {}),
+    };
 
     let store;
     if (existingStore) {
@@ -106,6 +144,7 @@ export async function PUT(request: Request) {
           address: body.address || null,
           phone: body.phone || null,
           settings: settingsJson,
+          ...smsData,
         },
       });
     } else {
@@ -116,11 +155,13 @@ export async function PUT(request: Request) {
           phone: body.phone || null,
           settings: settingsJson,
           companyId: session.user.companyId,
+          kind: "STORE",
+          ...smsData,
         },
       });
     }
 
-    return NextResponse.json(body);
+    return NextResponse.json({ ...settingsWithoutSecrets, smsApiKey: "", smsApiSecret: "" });
   } catch (error) {
     console.error("Settings API Error:", error);
     return NextResponse.json(

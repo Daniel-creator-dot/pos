@@ -79,6 +79,22 @@ export async function saveCustomer(
   });
 }
 
+export async function ensureShopSms(prisma: Db, companyId: string) {
+  const shop = await prisma.store.findFirst({
+    where: { companyId, kind: "STORE" },
+  });
+  if (!shop) return null;
+  if (shop.smsProvider) return shop;
+  return prisma.store.update({
+    where: { id: shop.id },
+    data: {
+      smsEnabled: true,
+      smsProvider: "intek",
+      smsSenderId: process.env.INTEK_SMS_SENDER || "Swiftpos",
+    },
+  });
+}
+
 export async function textCustomer(
   prisma: PrismaClient,
   args: {
@@ -90,9 +106,10 @@ export async function textCustomer(
     reference?: string | null;
   }
 ) {
+  const shop = args.companyId ? await ensureShopSms(prisma, args.companyId) : null;
   const log = await prisma.smsLog.create({
     data: {
-      storeId: args.storeId,
+      storeId: shop?.id || args.storeId,
       companyId: args.companyId,
       recipient: args.phone,
       message: args.message,
@@ -101,7 +118,12 @@ export async function textCustomer(
       reference: args.reference || null,
     },
   });
-  const result = await sendIntekSms(args.phone, args.message, process.env.INTEK_SMS_SENDER || "Swiftpos");
+  const result = await sendIntekSms(
+    args.phone,
+    args.message,
+    shop?.smsSenderId || process.env.INTEK_SMS_SENDER || "Swiftpos",
+    shop?.smsApiKey || undefined
+  );
   await prisma.smsLog.update({
     where: { id: log.id },
     data: {

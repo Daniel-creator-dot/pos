@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { ensureShopSms } from "@/lib/customers";
+import { sendIntekSms } from "@/lib/sms/intek";
 
 // GET /api/sms - Get SMS logs and configuration
 export async function GET(request: Request) {
@@ -20,27 +22,12 @@ export async function GET(request: Request) {
     const type = searchParams.get("type");
     const limit = parseInt(searchParams.get("limit") || "50");
 
+    if (session.user.companyId) {
+      await ensureShopSms(prisma, session.user.companyId);
+    }
+
     // Get store configuration with SMS settings
-    const store = await prisma.store.findFirst({
-      where: {
-        companyId: session.user.companyId || undefined,
-        users: {
-          some: {
-            id: session.user.id
-          }
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        smsEnabled: true,
-        smsProvider: true,
-        smsApiKey: true,
-        smsApiSecret: true,
-        smsSenderId: true,
-        smsEndpoint: true,
-      }
-    });
+    const store = await shopStore(session.user.companyId, session.user.storeId);
 
     // Get SMS logs
     const where: any = {};
@@ -88,16 +75,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { recipients, message, recipient, type = "notification" } = body;
 
+    if (session.user.companyId) {
+      await ensureShopSms(prisma, session.user.companyId);
+    }
+
     // Get store configuration
-    const store = await prisma.store.findFirst({
-      where: {
-        users: {
-          some: {
-            id: session.user.id
-          }
-        }
-      }
-    });
+    const store = await shopStore(session.user.companyId, session.user.storeId);
 
     if (!store) {
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
@@ -129,6 +112,7 @@ export async function POST(request: Request) {
           const smsLogEntry = await prisma.smsLog.create({
             data: {
               storeId: store.id,
+              companyId: session.user.companyId,
               recipient: rcpt,
               message,
               status: "pending",
@@ -146,7 +130,7 @@ export async function POST(request: Request) {
             },
           });
 
-          results.push({ recipient: rcpt, success: result.success, error: result.error });
+          results.push({ recipient: rcpt, success: result.success, error: result.success ? undefined : publicSmsError(result.error) });
         } catch (error) {
           results.push({ recipient: rcpt, success: false, error: "Failed to create log" });
         }
@@ -192,7 +176,7 @@ export async function POST(request: Request) {
       if (result.success) {
         return NextResponse.json({ success: true, id: smsLogEntry.id });
       } else {
-        return NextResponse.json({ error: result.error }, { status: 500 });
+        return NextResponse.json({ error: publicSmsError(result.error) }, { status: 500 });
       }
     }
   } catch (error) {
@@ -204,12 +188,32 @@ export async function POST(request: Request) {
   }
 }
 
+function publicSmsError(error?: string) {
+  if (error && error.includes("Sender ID")) {
+    return "Intek accepted the request, then held the sender name Swiftpos. Add the required URL on that sender ID in the Intek account, then send again.";
+  }
+  return "The text could not be delivered.";
+}
+
+async function shopStore(companyId?: string | null, storeId?: string | null) {
+  if (storeId) {
+    const own = await prisma.store.findUnique({ where: { id: storeId } });
+    if (own?.kind === "STORE") return own;
+  }
+  if (!companyId) return null;
+  return prisma.store.findFirst({
+    where: { companyId, kind: "STORE" },
+  });
+}
+
 // Helper function to send SMS based on provider
 async function sendSMS(store: any, recipient: string, message: string) {
   const result: { success: boolean; error?: string } = { success: false };
 
   try {
-    if (store.smsProvider === "twilio") {
+    if (store.smsProvider === "intek") {
+      return await sendIntekSms(recipient, message, store.smsSenderId || "Swiftpos", store.smsApiKey);
+    } else if (store.smsProvider === "twilio") {
       return await sendViaTwilio(store, recipient, message);
     } else if (store.smsProvider === "africas_talking") {
       return await sendViaAfricasTalking(store, recipient, message);

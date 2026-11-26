@@ -191,7 +191,13 @@ async function provisionShop(prisma: PrismaClient) {
           status: "ACTIVE",
           stores: {
             create: [
-              { name: `${SHOP_NAME} - Shop`, kind: "STORE" },
+              {
+                name: `${SHOP_NAME} - Shop`,
+                kind: "STORE",
+                smsEnabled: true,
+                smsProvider: "intek",
+                smsSenderId: "Swiftpos",
+              },
               { name: `${SHOP_NAME} - Warehouse`, kind: "WAREHOUSE" },
             ],
           },

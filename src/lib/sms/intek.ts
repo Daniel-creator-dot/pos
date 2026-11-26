@@ -10,8 +10,13 @@ interface SendSmsResponse {
  * @param message The SMS text content
  * @param senderName The approved sender name registered with Intek (defaults to "Swiftpos")
  */
-export async function sendIntekSms(to: string, message: string, senderName: string = "Swiftpos"): Promise<SendSmsResponse> {
-  const apiKey = process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
+export async function sendIntekSms(
+  to: string,
+  message: string,
+  senderName: string = "Swiftpos",
+  apiKeyOverride?: string | null
+): Promise<SendSmsResponse> {
+  const apiKey = apiKeyOverride || process.env.INTEK_SMS_API_KEY || "INTEK_7C48EA.d4a1425f4c8df82048d0bcef598e8e6965d0d73df5ce6562";
   
   // Format the recipient phone number: ensure it does not contain spaces or hyphens
   let formattedRecipient = to.replace(/[\s\-\(\)]/g, "");

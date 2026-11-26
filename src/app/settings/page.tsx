@@ -32,11 +32,11 @@ export default function SettingsPage() {
     taxRate: 0,
     currency: "USD",
     lowStockThreshold: 5,
-    smsEnabled: false,
-    smsProvider: "generic",
+    smsEnabled: true,
+    smsProvider: "intek",
     smsApiKey: "",
     smsApiSecret: "",
-    smsSenderId: "",
+    smsSenderId: "Swiftpos",
     smsEndpoint: "",
   });
   const [loading, setLoading] = useState(true);
@@ -247,6 +247,7 @@ export default function SettingsPage() {
                         onChange={(e) => setSettings({ ...settings, smsProvider: e.target.value })}
                         className="input"
                       >
+                        <option value="intek">Intek SMS</option>
                         <option value="generic">Generic HTTP</option>
                         <option value="twilio">Twilio</option>
                         <option value="africas_talking">Africa's Talking</option>
