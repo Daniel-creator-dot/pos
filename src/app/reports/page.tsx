@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
+import { endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { BarChart3, DollarSign, ShoppingCart, Package, TrendingUp, Download } from "lucide-react";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { formatCurrency } from "@/lib/currency";
@@ -43,13 +43,13 @@ export default function ReportsPage() {
     }
   };
 
-  const fetchReportData = async () => {
+  const fetchReportData = async (range = dateRange) => {
     setIsGenerating(true);
     try {
       let url = "/api/reports";
       const params = new URLSearchParams();
-      if (dateRange.start) params.append("start", dateRange.start);
-      if (dateRange.end) params.append("end", dateRange.end);
+      if (range.start) params.append("start", range.start);
+      if (range.end) params.append("end", range.end);
       if (params.toString()) url += `?${params.toString()}`;
 
       const response = await fetch(url);
@@ -138,6 +138,26 @@ export default function ReportsPage() {
 
         <div className="card mb-6">
           <div className="card-content">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[
+                { label: "Today", start: new Date(), end: new Date() },
+                { label: "This week", start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: endOfWeek(new Date(), { weekStartsOn: 1 }) },
+                { label: "This month", start: startOfMonth(new Date()), end: endOfMonth(new Date()) },
+              ].map((range) => (
+                <button
+                  key={range.label}
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const next = { start: format(range.start, "yyyy-MM-dd"), end: format(range.end, "yyyy-MM-dd") };
+                    setDateRange(next);
+                    fetchReportData(next);
+                  }}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-4">
               <div>
                 <label className="label block mb-1 text-xs">Start Date</label>
@@ -158,7 +178,7 @@ export default function ReportsPage() {
                 />
               </div>
               <button
-                onClick={fetchReportData}
+                onClick={() => fetchReportData()}
                 disabled={isGenerating}
                 className="btn btn-primary mt-6 flex items-center justify-center gap-2 min-w-[140px]"
               >

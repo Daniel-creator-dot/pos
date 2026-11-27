@@ -113,7 +113,7 @@ export default function CustomersPage() {
         <div className="max-w-5xl mx-auto p-4 grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
           <section className="bg-white rounded-2xl border border-slate-200">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-950">Saved numbers</h2>
+              <h2 className="font-semibold text-slate-950">1. Choose numbers</h2>
               <div className="flex gap-2">
                 <button
                   className="btn btn-secondary text-xs"
@@ -159,14 +159,14 @@ export default function CustomersPage() {
 
           <div className="space-y-4">
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <h2 className="font-semibold text-slate-950">Add a number</h2>
+              <h2 className="font-semibold text-slate-950">2. Add a number</h2>
               <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
               <input className="input" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <button className="btn btn-primary w-full" disabled={busy} onClick={add}>Save number</button>
             </section>
 
             <section id="bulk-sms" className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <h2 className="font-semibold text-slate-950">Bulk SMS</h2>
+              <h2 className="font-semibold text-slate-950">3. Write and send</h2>
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
                 Texts use the sender name Swiftpos. Intek is holding that name, so a text will not go out until the website https://posbytz.onrender.com is added to Swiftpos in the Intek account.
               </p>
@@ -186,7 +186,7 @@ export default function CustomersPage() {
                 value={extraPhones}
                 onChange={(e) => setExtraPhones(e.target.value)}
               />
-              <button className="btn btn-primary w-full" disabled={busy || (selected.length === 0 && extraCount === 0)} onClick={send}>
+              <button className="btn btn-primary w-full" disabled={busy || !message.trim() || (selected.length === 0 && extraCount === 0)} onClick={send}>
                 <Send className="w-4 h-4 mr-2" />
                 Send bulk SMS
               </button>

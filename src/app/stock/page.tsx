@@ -292,8 +292,13 @@ export default function StockPage() {
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
           <h1 className="text-2xl font-bold text-gray-900">Stock</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Shop floor and warehouse. Deliveries sit in the warehouse until you move them to the shop.
+            Receive into the warehouse, count it, move it to the shop, then sell it on the register.
           </p>
+          <ol className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+            {["1. Purchase", "2. Warehouse", "3. Shop floor", "4. Register"].map((step) => (
+              <li key={step} className="rounded-full bg-slate-100 text-slate-700 px-3 py-1">{step}</li>
+            ))}
+          </ol>
         </header>
 
         <main className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">

@@ -217,8 +217,7 @@ export default function PurchasesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Purchases</h1>
-            <p className="text-sm text-gray-500 mt-1">Received goods go into the warehouse. Move them to the shop from Stock.</p>
-            <p className="text-sm text-gray-500 mt-1">Manage supplier purchases</p>
+            <p className="text-sm text-gray-500 mt-1">Record a delivery. The pieces land in the warehouse, then you move them to the shop from Stock.</p>
           </div>
           {canCreate && (
             <button onClick={openCreateModal} className="btn btn-primary flex items-center gap-2">
