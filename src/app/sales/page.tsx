@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
+import { endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { Search, Eye, Receipt, ArrowLeft, Package } from "lucide-react";
 import Link from "next/link";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
@@ -231,6 +231,12 @@ export default function SalesHistoryPage() {
                       <span className="font-medium text-red-600">-{formatCurrency(selectedSale.subtotal * selectedSale.discount / 100, currency)}</span>
                     </div>
                   )}
+                  {Number(selectedSale.tax) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Tax:</span>
+                      <span className="font-medium">{formatCurrency(selectedSale.tax || 0, currency)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
                     <span>Total:</span>
                     <span>{formatCurrency(selectedSale.total, currency)}</span>
@@ -334,6 +340,25 @@ export default function SalesHistoryPage() {
       <main className="p-6 max-w-7xl mx-auto">
         <div className="card mb-6">
           <div className="card-content">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[
+                { label: "Today", start: new Date(), end: new Date() },
+                { label: "This week", start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: endOfWeek(new Date(), { weekStartsOn: 1 }) },
+                { label: "This month", start: startOfMonth(new Date()), end: endOfMonth(new Date()) },
+              ].map((range) => (
+                <button
+                  key={range.label}
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setStartDate(format(range.start, "yyyy-MM-dd"));
+                    setEndDate(format(range.end, "yyyy-MM-dd"));
+                  }}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="label block mb-1 text-xs">Search</label>

@@ -232,7 +232,7 @@ export default function ProductsPage() {
   };
 
   const lowStockProducts = products.filter(
-    (p) => p.stockQty <= p.lowStockThreshold
+    (p) => (p.shopQty ?? p.stockQty) <= p.lowStockThreshold
   );
 
   if (loading) {

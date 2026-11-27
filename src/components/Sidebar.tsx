@@ -82,7 +82,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   }
 
   // If on login page, render children without sidebar
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname.startsWith("/login/")) {
     return <>{children}</>;
   }
 

@@ -82,24 +82,28 @@ export default function DashboardPage() {
       value: formatCurrency(stats?.todaySales ?? 0, currency),
       icon: DollarSign,
       tone: "bg-emerald-500",
+      href: "/sales",
     },
     {
       label: "Today's profit",
       value: formatCurrency(stats?.todayProfit ?? 0, currency),
       icon: TrendingUp,
       tone: "bg-sky-500",
+      href: "/reports",
     },
     {
       label: "Orders",
       value: String(stats?.todayOrders ?? 0),
       icon: ShoppingCart,
       tone: "bg-indigo-500",
+      href: "/sales",
     },
     {
       label: "Low on the shop floor",
       value: String(stats?.lowStockItems ?? 0),
       icon: AlertTriangle,
       tone: "bg-rose-500",
+      href: "/stock",
     },
   ];
 
@@ -136,13 +140,13 @@ export default function DashboardPage() {
             {cards.map((card) => {
               const Icon = card.icon;
               return (
-                <article key={card.label} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <Link key={card.label} href={card.href} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:border-slate-400">
                   <div className={`w-10 h-10 rounded-xl ${card.tone} text-white flex items-center justify-center mb-3`}>
                     <Icon className="w-5 h-5" />
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
                   <p className="text-2xl sm:text-3xl font-bold text-slate-950 mt-1">{card.value}</p>
-                </article>
+                </Link>
               );
             })}
           </section>

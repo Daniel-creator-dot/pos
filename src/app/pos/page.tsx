@@ -70,6 +70,10 @@ export default function POSPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [textOffers, setTextOffers] = useState(true);
+  const [shopName, setShopName] = useState("SwiftPOS");
+  const [scanNotice, setScanNotice] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [payStep, setPayStep] = useState<"customer" | "pay">("customer");
 
   // Monitor online status
   useEffect(() => {
@@ -97,6 +101,7 @@ export default function POSPage() {
           const data = await settingsRes.json();
           setCurrency(data.currency || "GHS");
           setTaxRate(Number(data.taxRate) || 0);
+          setShopName(data.name || "SwiftPOS");
         }
 
         if (productsRes?.ok) {
@@ -155,7 +160,9 @@ export default function POSPage() {
       if (product) {
         addToCart(product);
         setBarcodeValue("");
+        setScanNotice("");
       } else {
+        setScanNotice(`No product matches ${barcodeValue.trim()}`);
         setBarcodeValue("");
       }
     }
@@ -213,19 +220,21 @@ export default function POSPage() {
   const discountAmount = totals.discountAmount;
   const taxAmount = totals.tax;
   const total = totals.total;
+  const paid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const due = Math.max(0, Math.round((total - paid) * 100) / 100);
+  const change = Math.max(0, Math.round((paid - total) * 100) / 100);
 
   // Complete sale
   const completeSale = async () => {
     if (cart.length === 0) return;
 
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    if (totalPaid < total) {
-      alert("Insufficient payment amount");
+    if (paid < total) {
+      setPaymentError("The amount paid is still short of the total.");
       return;
     }
 
     if (!isOnline) {
-      alert("Cannot complete transaction. You are offline. Please reconnect to the internet.");
+      setPaymentError("You are offline. Reconnect, then complete the sale.");
       return;
     }
 
@@ -257,7 +266,8 @@ export default function POSPage() {
       const result = await response.json().catch(() => ({ error: "Unknown response error" }));
 
       if (response.ok) {
-        setLastSale(result);
+        setPaymentError("");
+        setLastSale({ ...result, customerName, customerPhone });
         setShowReceipt(true);
         setIsPaymentModalOpen(false);
         setCart([]);
@@ -271,11 +281,11 @@ export default function POSPage() {
           setProducts(data.filter((product: { isPendingDelete?: boolean }) => !product.isPendingDelete));
         }
       } else {
-        alert(`Failed to complete transaction: ${result.error || "Server error"}`);
+        setPaymentError(result.error || "The sale did not save.");
       }
     } catch (error: any) {
       console.error("Sale error:", error);
-      alert(`Sale error: ${error.message || "Failed to complete transaction. Please check your internet connection."}`);
+      setPaymentError(error.message || "The sale did not save. Check the connection and try again.");
     } finally {
       setProcessing(false);
     }
@@ -319,14 +329,19 @@ export default function POSPage() {
                 )}
                 {lastSale.receiptSms?.status === "failed" && (
                   <p className="text-sm text-amber-700 mt-2">
-                    Number saved. The receipt text did not go through.
+                    {lastSale.receiptSms.detail || "Number saved. The receipt text did not go through."}
+                  </p>
+                )}
+                {lastSale.customerPhone && (
+                  <p className="text-sm text-slate-600 mt-2">
+                    {lastSale.customerName || "Customer"} · {lastSale.customerPhone}
                   </p>
                 )}
               </div>
 
               <div className="receipt-print bg-gray-50 p-4 rounded-lg mb-6 font-mono text-sm">
                 <div className="text-center mb-4">
-                  <p className="font-bold">SwiftPOS</p>
+                  <p className="font-bold">{shopName}</p>
                   <p className="text-xs text-gray-500">
                     {format(new Date(lastSale.createdAt), "MMM d, yyyy h:mm a")}
                   </p>
@@ -423,14 +438,17 @@ export default function POSPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Payment</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {payStep === "customer" ? "Customer" : "Payment"}
+                </h2>
                 <button
                   onClick={() => {
                     setIsPaymentModalOpen(false);
                     setAddingPaymentMethod(null);
                     setPaymentAmountInput("");
                     setMomoPhoneInput("");
+                    setPaymentError("");
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -438,42 +456,72 @@ export default function POSPage() {
                 </button>
               </div>
 
-              <div className="mb-6">
+              <div className="grid grid-cols-3 gap-2 mb-4 text-xs font-semibold">
+                {["Ticket", "Customer", "Pay"].map((label, index) => {
+                  const active = (payStep === "customer" && index <= 1) || (payStep === "pay" && index <= 2);
+                  const current = (payStep === "customer" && index === 1) || (payStep === "pay" && index === 2);
+                  return (
+                    <div
+                      key={label}
+                      className={`rounded-full px-2 py-1 text-center ${
+                        current ? "bg-slate-950 text-white" : active ? "bg-slate-200 text-slate-800" : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {index + 1}. {label}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mb-4">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Total Amount</p>
+                  <p className="text-sm text-gray-500">{due > 0 ? "Still to pay" : "Change"}</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {formatCurrency(total, currency)}
+                    {formatCurrency(due > 0 ? due : change, currency)}
                   </p>
+                  <p className="text-xs text-slate-500 mt-1">Total {formatCurrency(total, currency)}</p>
                 </div>
               </div>
 
-              <div className="mb-6 space-y-2">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Customer number
-                </label>
-                <input
-                  className="input w-full"
-                  placeholder="Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-                <input
-                  className="input w-full"
-                  placeholder="Phone for the receipt"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                />
-                <label className="flex items-center gap-2 text-sm text-gray-700">
+              {payStep === "customer" && (
+                <div className="mb-6 space-y-2">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Who is buying
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={textOffers}
-                    onChange={(e) => setTextOffers(e.target.checked)}
+                    className="input w-full"
+                    placeholder="Name, or leave blank for a walk-in"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
                   />
-                  Text new arrivals and promotions
-                </label>
-              </div>
+                  <input
+                    className="input w-full"
+                    placeholder="Phone for the receipt text"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={textOffers}
+                      onChange={(e) => setTextOffers(e.target.checked)}
+                    />
+                    Text new arrivals and promotions
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-primary w-full h-12"
+                    onClick={() => {
+                      setPayStep("pay");
+                      setPaymentError("");
+                    }}
+                  >
+                    Continue to payment
+                  </button>
+                </div>
+              )}
 
-              {addingPaymentMethod ? (
+              {payStep === "pay" && addingPaymentMethod ? (
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-gray-800">
@@ -528,13 +576,14 @@ export default function POSPage() {
                     onClick={() => {
                       const amt = parseFloat(paymentAmountInput);
                       if (isNaN(amt) || amt <= 0) {
-                        alert("Please enter a valid amount greater than 0");
+                        setPaymentError("Enter an amount greater than 0.");
                         return;
                       }
                       if (addingPaymentMethod === "MOBILE_MONEY" && !momoPhoneInput.trim()) {
-                        alert("Please enter a Mobile Money phone number");
+                        setPaymentError("Enter the Mobile Money number.");
                         return;
                       }
+                      setPaymentError("");
 
                       setPayments((prev) => [
                         ...prev,
@@ -555,9 +604,14 @@ export default function POSPage() {
                     Confirm Payment
                   </button>
                 </div>
-              ) : (
+              ) : payStep === "pay" ? (
                 <div className="space-y-4 mb-6">
-                  <h3 className="font-medium text-gray-700">Payment Method</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-700">Payment method</h3>
+                    <button type="button" className="text-sm font-semibold text-primary-600" onClick={() => setPayStep("customer")}>
+                      Customer
+                    </button>
+                  </div>
                   {[
                     { id: "CASH", label: "Cash", icon: Banknote },
                     { id: "CARD", label: "Card", icon: CreditCard },
@@ -578,8 +632,20 @@ export default function POSPage() {
                       <span className="font-medium">{method.label}</span>
                     </button>
                   ))}
+                  {due > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayments((prev) => [...prev, { method: "CASH", amount: due }]);
+                        setPaymentError("");
+                      }}
+                      className="w-full h-12 rounded-xl bg-emerald-600 text-white font-semibold"
+                    >
+                      Cash {formatCurrency(due, currency)}
+                    </button>
+                  )}
                 </div>
-              )}
+              ) : null}
 
               {payments.length > 0 && (
                 <div className="mb-6">
@@ -622,16 +688,19 @@ export default function POSPage() {
                 </div>
               )}
 
+              {paymentError && (
+                <p className="mb-3 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{paymentError}</p>
+              )}
+
+              {payStep === "pay" && (
               <button
                 onClick={completeSale}
-                disabled={
-                  processing ||
-                  payments.reduce((s, p) => s + p.amount, 0) < total
-                }
+                disabled={processing || paid < total}
                 className="btn btn-primary w-full h-12 text-lg"
               >
-                {processing ? "Processing..." : "Complete Sale"}
+                {processing ? "Saving the sale..." : change > 0 ? `Complete sale · change ${formatCurrency(change, currency)}` : "Complete sale"}
               </button>
+              )}
             </div>
           </div>
         </div>
@@ -704,6 +773,7 @@ export default function POSPage() {
                     autoFocus
                   />
                 </div>
+                {scanNotice && <p className="text-xs text-rose-600 mt-1">{scanNotice}</p>}
               </form>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -721,6 +791,9 @@ export default function POSPage() {
           {/* Products Grid */}
           <div className="flex-1 overflow-auto p-3 sm:p-4 pb-24 lg:pb-4">
             <div className="pos-grid">
+              {filteredProducts.length === 0 && (
+                <p className="col-span-full text-center text-slate-500 py-16">No products match that search.</p>
+              )}
               {filteredProducts.map((product) => (
                 <div
                   key={product.id}
@@ -864,6 +937,8 @@ export default function POSPage() {
                 setAddingPaymentMethod(null);
                 setPaymentAmountInput("");
                 setMomoPhoneInput("");
+                setPaymentError("");
+                setPayStep("customer");
                 setIsPaymentModalOpen(true);
                 setIsCartOpen(false);
               }}
